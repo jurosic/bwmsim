@@ -45,6 +45,11 @@ class SY6502():
         
         self.instruction_set = {
             0x69: self._adc_i,
+            #0x6d: self._adc_a,
+            0x65: self._adc_zp,
+            #0x29: self._and_i,
+            #0x2d: self._and_a,
+            #0x25: self._and_zp,
             0x65: self._adc_zp,
             0xf0: self._beq,
             0x30: self._bmi,
@@ -88,33 +93,37 @@ class SY6502():
             "rw" : self.rw.state
         }
         
-        
-    def _adc_i(self, ccb):
-        self.__increment_addr_reg()
-        self.__push_addr_bus()
-        
-        ccb()
-        
-        val = self.data_bus.state.copy()
-        reg_val = self.reg_ACC.state.copy()
-        
+    def _adc(self, val, reg_val):
         val = int(''.join(['1' if x else '0' for x in val]), 2)
         reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
         
         reg_val += val
         
-        #simulate overflow (should be in ele.py)
+        #simulate overflow
         if reg_val > 255:
             regp = self.reg_P.state
             regp[1] = True
+            self.reg_P.signal(regp)
             reg_val -= 255
-        
+            
         reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
         #paaaad :((
         pad = [False for _ in range(8-len(reg_val))]
         pad.extend(reg_val)
         
         self.reg_ACC.signal(pad)
+        
+    def _adc_i(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._adc(val, reg_val)
         
     def _adc_zp(self, ccb):
         self.__increment_addr_reg()
@@ -134,23 +143,7 @@ class SY6502():
         val = self.data_bus.state.copy()
         reg_val = self.reg_ACC.state.copy()
         
-        val = int(''.join(['1' if x else '0' for x in val]), 2)
-        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
-        
-        reg_val += val
-        
-        if reg_val > 255:
-            regp = self.reg_P.state
-            regp[1] = True
-            self.reg_P.signal(regp)
-            reg_val -= 255
-        
-        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
-        #paaaad :((
-        pad = [False for _ in range(8-len(reg_val))]
-        pad.extend(reg_val)
-        
-        self.reg_ACC.signal(pad)
+        self._adc(val, reg_val)
     
     def _beq(self, ccb):
         self.__increment_addr_reg()
@@ -220,34 +213,36 @@ class SY6502():
     def _clv(self, ccb):
         raise NotImplemented
     
+    def _cmp(self, val, reg_val):
+        regp = self.reg_P.state
+        if val > reg_val:
+            regp[0] = False
+            regp[6] = False
+        
+        if val == reg_val:
+            regp[0] = False
+            regp[6] = True
+            
+        if val < reg_val:
+            regp[0] = True
+            regp[6] = False
+            
+        self.reg_P.signal(regp)
+        
+    
     def _cmp_i(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
         
         ccb()
         
-        acc = ''.join(['1' if x else '0' for x in self.reg_ACC.state])
-        acc = int(acc, 2)
+        reg_val = ''.join(['1' if x else '0' for x in self.reg_ACC.state])
+        reg_val = int(reg_val, 2)
         
-        data = ''.join(['1' if x else '0' for x in self.data_bus.state])
-        data = int(data, 2)
+        val = ''.join(['1' if x else '0' for x in self.data_bus.state])
+        val = int(val, 2)
         
-        res = acc-data
-        
-        regp = self.reg_P.state.copy()
-        if res > 0:
-            regp[0] = False
-            regp[6] = False
-        
-        if res == 0:
-            regp[0] = False
-            regp[6] = True
-            
-        if res < 0:
-            regp[0] = True
-            regp[6] = False
-            
-        self.reg_P.signal(regp)
+        self._cmp(val, reg_val)
 
     def _cpx_i(self, ccb):
         self.__increment_addr_reg()
@@ -255,26 +250,13 @@ class SY6502():
         
         ccb()
         
-        x = ''.join(['1' if x else '0' for x in self.reg_X.state])
-        x = int(x, 2)
+        reg_val = ''.join(['1' if x else '0' for x in self.reg_X.state])
+        reg_val = int(reg_val, 2)
         
-        data = ''.join(['1' if x else '0' for x in self.data_bus.state])
-        data = int(data, 2)
+        val = ''.join(['1' if x else '0' for x in self.data_bus.state])
+        val = int(val, 2)
         
-        regp = self.reg_P.state.copy()
-        if data > x:
-            regp[0] = False
-            regp[6] = False
-        
-        if data == x:
-            regp[0] = False
-            regp[6] = True
-            
-        if data < x:
-            regp[0] = True
-            regp[6] = False
-            
-        self.reg_P.signal(regp)
+        self._cmp(val, reg_val)
 
     def _cpy_i(self, ccb):
         self.__increment_addr_reg()
@@ -282,26 +264,13 @@ class SY6502():
         
         ccb()
         
-        y = ''.join(['1' if x else '0' for x in self.reg_Y.state])
-        y = int(y, 2)
+        reg_val = ''.join(['1' if x else '0' for x in self.reg_Y.state])
+        reg_val = int(reg_val, 2)
         
-        data = ''.join(['1' if x else '0' for x in self.data_bus.state])
-        data = int(data, 2)
+        val = ''.join(['1' if x else '0' for x in self.data_bus.state])
+        val = int(val, 2)
         
-        regp = self.reg_P.state.copy()
-        if data > y:
-            regp[0] = False
-            regp[6] = False
-        
-        if data == y:
-            regp[0] = False
-            regp[6] = True
-            
-        if data < y:
-            regp[0] = True
-            regp[6] = False
-            
-        self.reg_P.signal(regp)
+        self._cmp(val, reg_val)
 
     def _jmp_a(self, ccb):
         self.__increment_addr_reg()
