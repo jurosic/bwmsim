@@ -45,7 +45,7 @@ class SY6502():
         
         self.instruction_set = {
             0x69: self._adc_i,
-            #0x6d: self._adc_a,
+            0x6d: self._adc_a,
             0x65: self._adc_zp,
             #0x29: self._and_i,
             #0x2d: self._and_a,
@@ -144,6 +144,9 @@ class SY6502():
         reg_val = self.reg_ACC.state.copy()
         
         self._adc(val, reg_val)
+        
+    def _adc_a(self, ccb):
+        raise NotImplemented
     
     def _beq(self, ccb):
         self.__increment_addr_reg()
@@ -441,7 +444,7 @@ class SY6502():
         self.reg_Y.signal(self.reg_ACC.state.copy())
         
     def _tsx(self, ccb):
-        self.reg_X.signal(self.reg_S.state.copt())
+        self.reg_X.signal(self.reg_S.state.copy())
         
     def _txa(self, ccb):
         self.reg_ACC.signal(self.reg_X.state.copy())
@@ -528,10 +531,10 @@ class SY6502():
                 f"PCL :{mon['pcl']:#010b} ({hex(mon['pcl'])})",
                 f"PCH :{mon['pch']:#010b} ({hex(mon['pch'])})",
                 f"ACC :{mon['acc']:#010b} ({hex(mon['acc'])})",
-                f"X   :{mon['x']:010b} ({hex(mon['x'])})",
-                f"Y   :{mon['y']:010b} ({hex(mon['y'])})",
-                f"P   :{mon['p']:010b} ({hex(mon['p'])})",
-                f"S   :{mon['s']:010b} ({hex(mon['s'])})",
+                f"X   :{mon['x']:#010b} ({hex(mon['x'])})",
+                f"Y   :{mon['y']:#010b} ({hex(mon['y'])})",
+                f"P   :{mon['p']:#010b} ({hex(mon['p'])})",
+                f"S   :{mon['s']:#010b} ({hex(mon['s'])})",
                 f"RW  :{mon['rw']}"
               )))
         

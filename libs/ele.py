@@ -3,16 +3,16 @@ class Pin():
         self.connections = []
         self._state = False
        
-    def connect(self, other: Pin, __neighbor: bool = True):
+    def connect(self, other: Pin, _neighbor: bool = True):
         if not isinstance(other, Pin):
             raise TypeError(f"{type(other)} is not of type pin")
         
         self.connections.append(other)
-        if __neighbor:
+        if _neighbor:
             other.connect(self, False)
 
         
-    def signal(self, signal: bool, __ignore: Pin = None):
+    def signal(self, signal: bool, _ignore: Pin = None):
         if not isinstance(signal, bool):
             raise TypeError(f"{type(signal)} is not of type bool")
         
@@ -20,7 +20,7 @@ class Pin():
         for pin in self.connections:
             #ignore makes sure we don't get stuck in an
             #infinite loop
-            if pin == __ignore:
+            if pin == _ignore:
                 continue
             pin.signal(signal, self)
             
@@ -46,7 +46,7 @@ class Group():
         for _ in range(0, count):
             self.pins.append(Pin())
     
-    def connect(self, other: Group, offset:int = 0, prange: list[int] = None, __neighbor: bool = True):
+    def connect(self, other: Group, offset:int = 0, prange: list[int] = None, _neighbor: bool = True):
         if not isinstance(other, Group):
             raise TypeError(f"{type(other)} is not of type group")
         
@@ -56,7 +56,7 @@ class Group():
 
         #exceptions very possible here
         self.connections.append(other)
-        if __neighbor:
+        if _neighbor:
             a = prange[0] if prange else 0
             b = prange[1] if prange else len(self.pins)
    
@@ -65,7 +65,7 @@ class Group():
                 self.pins[i].connect(other.pins[i-offset])
             
     
-    def signal(self, signal: list[bool], prange: tuple[int] = None, __ignore: Group = None):
+    def signal(self, signal: list[bool], prange: tuple[int, int] = None, _ignore: Group = None):
         if not prange and len(signal) > len(self.pins):
             raise ValueError(f"Lenght of signal ({len(signal)}) is bigger than lenght of group ({len(self.pins)})")
         
@@ -78,7 +78,7 @@ class Group():
         
         a = prange[0] if prange else 0
         b = prange[1]+1 if prange else len(self.pins)
-        if __ignore is not None:
+        if _ignore is not None:
             b = min(b, len(self.pins))
             
         
