@@ -145,7 +145,7 @@ class SY6502():
         
         self._adc(val, reg_val)
         
-    def _adc_a(self, ccb):
+    def _adc_a(self):
         raise NotImplemented
     
     def _beq(self, ccb):
@@ -168,7 +168,9 @@ class SY6502():
         ccb()
         
         addr_offset = self.data_bus.state.copy()
-        
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+
+
         regp = self.reg_P.state
         
         if regp[0] == True and regp[6] == False:
@@ -181,6 +183,7 @@ class SY6502():
         ccb()
         
         addr_offset = self.data_bus.state.copy()
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
         
         regp = self.reg_P.state
         
@@ -201,10 +204,10 @@ class SY6502():
         if regp[1] == True:
             self.__increment_addr_reg(addr_offset-1)
     
-    def _brk(self, ccb):
+    def _brk(self):
         self.run = False
         
-    def _clc(self, ccb):
+    def _clc(self):
         regp = self.reg_P.state
         regp[7] = False
         self.reg_P.signal(regp)
@@ -437,22 +440,22 @@ class SY6502():
         self.rw.signal(True)
         self.reg_X.signal([False for _ in range(8)])
         
-    def _tax(self, ccb):
+    def _tax(self):
         self.reg_X.signal(self.reg_ACC.state.copy())
         
-    def _tay(self, ccb):
+    def _tay(self):
         self.reg_Y.signal(self.reg_ACC.state.copy())
         
-    def _tsx(self, ccb):
+    def _tsx(self):
         self.reg_X.signal(self.reg_S.state.copy())
         
-    def _txa(self, ccb):
+    def _txa(self):
         self.reg_ACC.signal(self.reg_X.state.copy())
         
-    def _txs(self, ccb):
+    def _txs(self):
         self.reg_S.signal(self.reg_X.state.copy())
 
-    def _tya(self, ccb):
+    def _tya(self):
         self.reg_ACC.signal(self.reg_Y.state.copy())
         
         
