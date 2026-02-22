@@ -62,8 +62,9 @@ class SY6502():
             0x18: self._clc,
             0xd8: self._cld,
             0x58: self._cli,
-            0x88: self._clv,
+            0xB8: self._clv,
             0xc9: self._cmp_i,
+            0xc5: self._cmp_zp,
             0xe0: self._cpx_i,
             0xc0: self._cpy_i,
             0x4c: self._jmp_a,
@@ -276,6 +277,8 @@ class SY6502():
         ccb()
         
         addr_offset = int(''.join(['1' if x else '0' for x in self.data_bus.state]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
         
         regp = self.reg_P.state
         
@@ -290,6 +293,8 @@ class SY6502():
         
         addr_offset = self.data_bus.state.copy()
         addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
 
 
         regp = self.reg_P.state
@@ -305,6 +310,8 @@ class SY6502():
         
         addr_offset = self.data_bus.state.copy()
         addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
         
         regp = self.reg_P.state
         
@@ -319,10 +326,12 @@ class SY6502():
         
         addr_offset = self.data_bus.state.copy()
         addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
         
         regp = self.reg_P.state
         
-        if regp[0] == True and regp[6] == True:
+        if regp[6] == False:
             self.__increment_addr_reg(addr_offset-1)
             
     def _bvs(self, ccb):
@@ -333,7 +342,9 @@ class SY6502():
         
         addr_offset = self.data_bus.state.copy()
         addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
-        
+        if addr_offset > 127:
+            addr_offset -= 256
+
         regp = self.reg_P.state
         
         if regp[1] == True:
@@ -388,6 +399,26 @@ class SY6502():
         
         val = ''.join(['1' if x else '0' for x in self.data_bus.state])
         val = int(val, 2)
+        
+        self._cmp(val, reg_val)
+
+    def _cmp_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
         
         self._cmp(val, reg_val)
 
@@ -528,7 +559,7 @@ class SY6502():
         self.rw.signal(False)
         
         self.data_bus.signal(self.reg_ACC.state.copy())
-        self.reg_ACC.signal([False for _ in range(8)])
+        #self.reg_ACC.signal([False for _ in range(8)])
         
         ccb()
         
@@ -575,7 +606,7 @@ class SY6502():
         ccb()
         
         self.rw.signal(True)
-        self.reg_ACC.signal([False for _ in range(8)])
+        #self.reg_ACC.signal([False for _ in range(8)])
         
     def _stx_zp(self, ccb):
         self.__increment_addr_reg()
@@ -594,7 +625,7 @@ class SY6502():
         ccb()
         
         self.rw.signal(True)
-        self.reg_X.signal([False for _ in range(8)])
+        #self.reg_X.signal([False for _ in range(8)])
         
     def _tax(self, ccb):
         self.reg_X.signal(self.reg_ACC.state.copy())

@@ -66,10 +66,11 @@ INST_TABLE = {
             "imp": 0x58
         },
         "CLV": {
-            "imp": 0x88
+            "imp": 0xB8
         },
         "CMP": {
-            "imm": 0xC9
+            "imm": 0xC9,
+            "zp": 0xC5
         },
         "CPX": {
             "imm": 0xE0
@@ -180,6 +181,8 @@ def _inst_to_byte(inst: list[str], pos=0):
         case "CMP":
             if inst[1].startswith("#"):
                 return [INST_TABLE["CMP"]["imm"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["CMP"]["zp"], int(inst[1], 16)]
         
         case "CPX":
             if inst[1].startswith("#"):
@@ -387,7 +390,8 @@ def write_bytes(prog: list[list[int]], outfile: str):
                 for byte in prog[i]:
                     num_bytes = (byte.bit_length() + 7) // 8 or 1
                     print(f"{num_bytes} bytes for {byte}")
-                    f.write(byte.to_bytes(num_bytes, "little"))
+                    signed = byte < 0
+                    f.write(byte.to_bytes(num_bytes, "little", signed=signed))
                     byte_cnter += num_bytes  
                 i += 1
             elif byte_cnter > 32_761 and not wrote_reset_vector:
