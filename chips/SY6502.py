@@ -1,5 +1,6 @@
 from libs.ele import Pin as EPin
 from libs.ele import Group as EGroup
+from random import choice   
 
 class SY6502():
     def __init__(self):
@@ -25,6 +26,8 @@ class SY6502():
         self.reg_S.signal([True, True, True, True, True, True, True, True])
         #status reg
         self.reg_P   = EGroup(8)
+        #reg_P needs to be random
+        self.reg_P.signal([choice([True, False]) for _ in range(0, 8)])
         
         
         #Busses
@@ -47,9 +50,9 @@ class SY6502():
             0x69: self._adc_i,
             0x6d: self._adc_a,
             0x65: self._adc_zp,
-            #0x29: self._and_i,
-            #0x2d: self._and_a,
-            #0x25: self._and_zp,
+            0x29: self._and_i,
+            0x2d: self._and_a,
+            0x25: self._and_zp,
             0x65: self._adc_zp,
             0xf0: self._beq,
             0x30: self._bmi,
@@ -145,9 +148,127 @@ class SY6502():
         
         self._adc(val, reg_val)
         
-    def _adc_a(self):
-        raise NotImplemented
-    
+    def _adc_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._adc(val, reg_val)
+
+    def _and(self, val, reg_val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
+        
+        reg_val &= val
+        
+        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(reg_val))]
+        pad.extend(reg_val)
+        
+        self.reg_ACC.signal(pad)
+
+
+    def _and_i(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._and(val, reg_val)
+
+    def _and_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._and(val, reg_val)
+
+    def _and_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._and(val, reg_val)
+
+
     def _beq(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -213,11 +334,17 @@ class SY6502():
         self.reg_P.signal(regp)
         
     def _cld(self, ccb):
-        raise NotImplemented
+        regp = self.reg_P.state
+        regp[3] = False
+        self.reg_P.signal(regp)
     def _cli(self, ccb):
-        raise NotImplemented
+        regp = self.reg_P.state
+        regp[4] = False
+        self.reg_P.signal(regp)
     def _clv(self, ccb):
-        raise NotImplemented
+        regp = self.reg_P.state
+        regp[1] = False
+        self.reg_P.signal(regp)
     
     def _cmp(self, val, reg_val):
         regp = self.reg_P.state
