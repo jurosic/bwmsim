@@ -325,10 +325,10 @@ class SY6502():
         if regp[1] == True:
             self.__increment_addr_reg(addr_offset-1)
     
-    def _brk(self):
+    def _brk(self, ccb):
         self.run = False
         
-    def _clc(self):
+    def _clc(self, ccb):
         regp = self.reg_P.state
         regp[7] = False
         self.reg_P.signal(regp)
@@ -419,6 +419,21 @@ class SY6502():
         ccb()
         
         second = self.data_bus.state.copy()
+
+        #subtract one for the increment at the end of the cycle
+        #this is ugly but whatever
+        whole = []
+        whole.extend(second)
+        whole.extend(first)
+        whole = int(''.join(['1' if x else '0' for x in whole]), 2)
+        whole -= 1
+        whole = [True if x == '1' else False for x in bin(whole)[2:]]
+        pad = [False for _ in range(16-len(whole))]
+        pad.extend(whole)
+
+        #split
+        first = pad[8:16]
+        second = pad[0:8]
         
         self.reg_PCL.signal(first)
         self.reg_PCH.signal(second)
@@ -567,22 +582,22 @@ class SY6502():
         self.rw.signal(True)
         self.reg_X.signal([False for _ in range(8)])
         
-    def _tax(self):
+    def _tax(self, ccb):
         self.reg_X.signal(self.reg_ACC.state.copy())
         
-    def _tay(self):
+    def _tay(self, ccb):
         self.reg_Y.signal(self.reg_ACC.state.copy())
         
-    def _tsx(self):
+    def _tsx(self, ccb):
         self.reg_X.signal(self.reg_S.state.copy())
         
-    def _txa(self):
+    def _txa(self, ccb):
         self.reg_ACC.signal(self.reg_X.state.copy())
         
-    def _txs(self):
+    def _txs(self, ccb):
         self.reg_S.signal(self.reg_X.state.copy())
 
-    def _tya(self):
+    def _tya(self, ccb):
         self.reg_ACC.signal(self.reg_Y.state.copy())
         
         

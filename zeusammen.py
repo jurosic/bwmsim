@@ -69,7 +69,7 @@ def sanitize(line: str) -> list[str]:
     
     #truncate without comment
     #split into bytes
-    cde: str = line[:cmt_start]
+    cde = line[:cmt_start]
     cde = cde.strip()
     cde = cde.split(" ")
     
@@ -116,7 +116,12 @@ def preprocess(prog: list[list[str]]):
     byte_cnter = 0
     
     for inst in prog:
-        pass
+        for i in range(len(inst)):
+            if inst[i] in SYMTABLE.keys():
+                inst[i] = SYMTABLE[inst[i]] - byte_cnter - 1 #subtract byte counter and 1 for the instruction itself`
+
+        
+        byte_cnter += len(inst)
     
 def rn_cmp(infile: str, outfile: str):
     global SYMTABLE
@@ -131,11 +136,19 @@ def rn_cmp(infile: str, outfile: str):
     sanitized: list = []
     with open(infile, "r") as f:
         for line in f:
-            san: str = sanitize(line)
+            san = sanitize(line)
             if san != [""]:
                 sanitized.append(san)
     
     symbolize(sanitized)
+
+    print("Symbol Table:")
+    for k in SYMTABLE.keys():
+        print(f"\t{k} : {SYMTABLE[k]}")
+
+    preprocess(sanitized)
+
+    print(sanitized)
 
 
 
