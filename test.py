@@ -6,6 +6,8 @@ from chips.AT28C256 import AT28C256
 from chips.SY6502 import SY6502
 from chips.CY62256N import CY62256N
 
+from sys import argv
+
 rom = AT28C256()
 ram = CY62256N()
 cpu = SY6502()
@@ -20,7 +22,7 @@ def cb():
 
 if __name__ == "__main__":
 
-    rom.load('progs/fib-full.bin')
+    rom.load(argv[1])
 
 
     cpu.addr_bus.connect(rom.addr_bus, 1, (1, 16))

@@ -23,10 +23,215 @@ example code:
 
 import sys
 
+ORIGIN = 0x0000
+
 SYMTABLE = {}
+
+INST_TABLE = {
+        "ADC": {
+            "imm": 0x69,
+            "zp": 0x65,
+            "abs": 0x6D
+        },
+        "AND": {
+            "imm": 0x29,
+            "zp": 0x25,
+            "abs": 0x2D
+        },
+        "BEQ": {
+            "rel": 0xEF
+        },
+        "BMI": {
+            "rel": 0x30
+        },
+        "BNE": {
+            "rel": 0xD0
+        },
+        "BPL": {
+            "rel": 0x10
+        },
+        "BRK": {
+            "imp": 0x00
+        },
+        "BVS": {
+            "rel": 0x70
+        },
+        "CLC": {
+            "imp": 0x18
+        },
+        "CLD": {
+            "imp": 0xD8
+        },
+        "CLI": {
+            "imp": 0x58
+        },
+        "CLV": {
+            "imp": 0x88
+        },
+        "CMP": {
+            "imm": 0xC9
+        },
+        "CPX": {
+            "imm": 0xE0
+        }, "CPY": {
+            "imm": 0xC0
+        },
+        "JMP": {
+            "abs": 0x4C
+        },
+        "LDA": {
+            "imm": 0xA9,
+            "zp": 0xA5
+        },
+        "LDX": {
+            "imm": 0xA2,
+            "zp": 0xA6
+        },
+        "LDY": {
+            "imm": 0xA0
+        },
+        "PHA": {
+            "imp": 0x48
+        },
+        "PLA": {
+            "imp": 0x68
+        },
+        "STA": {
+            "zp": 0x85
+        },
+        "STX": {
+            "zp": 0x86
+        },
+        "TAX": {
+            "imp": 0xAA
+        },
+        "TAY": {
+            "imp": 0xA8
+        },
+        "TXA": {
+            "imp": 0x8A
+        },
+        "TYA": {
+            "imp": 0x98
+        }
+}        
+
+
 
 class StartUndefined(Exception):
     pass
+
+def _inst_to_byte(inst: list[str], pos=0): 
+    """
+        Converts an instruction into a list of bytes
+
+    Args:
+        inst (list[str]): instruction to be converted
+    """
+    
+    match inst[0].upper():
+        case "ADC":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["ADC"]["imm"], int(inst[1][1:], 16)]
+            elif inst[1].startswith("$"):
+                return [INST_TABLE["ADC"]["abs"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["ADC"]["zp"], int(inst[1], 16)]
+        
+        case "AND":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["AND"]["imm"], int(inst[1][1:], 16)]
+            elif inst[1].startswith("$"):
+                return [INST_TABLE["AND"]["abs"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["AND"]["zp"], int(inst[1], 16)]
+        
+        case "BEQ":
+            print(f"Calculating relative address for {inst[1]} at position {pos} with origin {ORIGIN}")
+            return [INST_TABLE["BEQ"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+        
+        case "BMI":
+            return [INST_TABLE["BMI"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+        
+        case "BNE":
+            return [INST_TABLE["BNE"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+        
+        case "BPL":
+            return [INST_TABLE["BPL"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+        
+        case "BRK":
+            return [INST_TABLE["BRK"]["imp"]]
+        
+        case "BVS":
+            return [INST_TABLE["BVS"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+        
+        case "CLC":
+            return [INST_TABLE["CLC"]["imp"]]
+        
+        case "CLD":
+            return [INST_TABLE["CLD"]["imp"]]
+        
+        case "CLI":
+            return [INST_TABLE["CLI"]["imp"]]
+        
+        case "CLV":
+            return [INST_TABLE["CLV"]["imp"]]
+        
+        case "CMP":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["CMP"]["imm"], int(inst[1][1:], 16)]
+        
+        case "CPX":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["CPX"]["imm"], int(inst[1][1:], 16)]
+        case "CPY":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["CPY"]["imm"], int(inst[1][1:], 16)]
+        case "JMP":
+            if inst[1].startswith("$"):
+                return [INST_TABLE["JMP"]["abs"], int(inst[1][1:], 16)]
+        case "LDA":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["LDA"]["imm"], int(inst[1][1:], 16)]
+            elif inst[1].startswith("$"):
+                return [INST_TABLE["LDA"]["abs"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["LDA"]["zp"], int(inst[1], 16)]
+        case "LDX":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["LDX"]["imm"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["LDX"]["zp"], int(inst[1], 16)]
+        case "LDY":
+            if inst[1].startswith("#"):
+                return [INST_TABLE["LDY"]["imm"], int(inst[1][1:], 16)]
+        case "PHA":
+            return [INST_TABLE["PHA"]["imp"]]
+        case "PLA":
+            return [INST_TABLE["PLA"]["imp"]]
+        case "STA":
+            if inst[1].startswith("$"):
+                return [INST_TABLE["STA"]["abs"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["STA"]["zp"], int(inst[1], 16)]
+        case "STX":
+            if inst[1].startswith("$"):
+                return [INST_TABLE["STX"]["abs"], int(inst[1][1:], 16)]
+            else:
+                return [INST_TABLE["STX"]["zp"], int(inst[1], 16)]
+        case "TAX":
+            return [INST_TABLE["TAX"]["imp"]]
+        case "TAY":
+            return [INST_TABLE["TAY"]["imp"]]
+        case "TXA":
+            return [INST_TABLE["TXA"]["imp"]]
+        case "TYA":
+            return [INST_TABLE["TYA"]["imp"]]
+        case _:
+            print(f"Unknown instruction: {inst[0]}")
+            raise Exception("Unknown instruction")
+            
+
 
 def _argsan(args: list[str]):
     """
@@ -91,15 +296,24 @@ def symbolize(prog: list[list[str]]):
     byte_ctr: int = 0
     
     for inst in prog:
-        if len(inst) != 1:
-            byte_ctr += len(inst)
-            continue
-        
         if inst[0].endswith(":"):
             #symbol definiton here
-            SYMTABLE[inst[0].strip(":")] = byte_ctr
-            
-        byte_ctr += len(inst)
+            SYMTABLE[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
+        else:
+            byte_ctr += len(inst)
+
+    #remove any labels from the program
+    plen = len(prog)
+    while plen > 0:
+        plen -= 1
+        i = len(prog) - plen - 1
+        if len(prog[i]) == 1 and prog[i][0].endswith(":"):
+            prog.pop(i)
+
+    #remove any empty lines
+    for i in range(len(prog)):
+        if prog[i] == []:
+            prog.pop(i)
 
     #check for start, more efficient this way than uppering or lowering
     if "start" not in SYMTABLE.keys() and "START" not in SYMTABLE.keys():
@@ -114,17 +328,68 @@ def preprocess(prog: list[list[str]]):
     """
     
     byte_cnter = 0
-    
+   
+    #shift all symtables after the byte_cnter to account for the fact that the instructions will be converted to bytes
+
     for inst in prog:
+        l = 0
         for i in range(len(inst)):
             if inst[i] in SYMTABLE.keys():
-                inst[i] = SYMTABLE[inst[i]] - byte_cnter - 1 #subtract byte counter and 1 for the instruction itself`
+                inst[i] = str(SYMTABLE[inst[i]])
+                l += inst[i].count("$") * 2 #account for the fact that the symbol will be converted to bytes
+                l += inst[i].count("#") * 1 #account for the fact that the symbol will be converted to bytes
 
-        
-        byte_cnter += len(inst)
+        for k in SYMTABLE.keys():    
+            if int(SYMTABLE[k][1:], 16) > byte_cnter + ORIGIN:
+                SYMTABLE[k] = "$" + str(hex(int(SYMTABLE[k][1:], 16) + l))[2:].upper()
+
+        byte_cnter += l
+
+
+    #convert instructions to bytes
+    byte_cnter = 0
+    for i in range(len(prog)):
+        byte_cnter += len(prog[i])
+        prog[i] = _inst_to_byte(prog[i], byte_cnter)
+
+def write_bytes(prog: list[list[int]], outfile: str):
+    """
+        Writes the program to a file
+
+    Args:
+        prog (list[list[int]]): program to be written
+        outfile (str): output file
+    """
+    wrote_reset_vector = False   
+    with open(outfile, "wb") as f:
+        i = 0
+        byte_cnter = 0
+        while True:
+            if byte_cnter >= 32_768:
+                break
+
+            if i < len(prog):
+                for byte in prog[i]:
+                    num_bytes = (byte.bit_length() + 7) // 8 or 1
+                    print(f"{num_bytes} bytes for {byte}")
+                    f.write(byte.to_bytes(num_bytes, "little"))
+                    byte_cnter += num_bytes  
+                i += 1
+            elif byte_cnter > 32_761 and not wrote_reset_vector:
+                print("Writing reset vector...")
+                #write the reset vector
+                f.write((0x4C).to_bytes(1, "little"))
+                num_bytes = (ORIGIN.bit_length() + 7) // 8 or 1
+                f.write(ORIGIN.to_bytes(num_bytes, "little"))
+                byte_cnter += num_bytes + 1
+                wrote_reset_vector = True
+            else:
+                f.write((0).to_bytes(1, "little"))
+                byte_cnter += 1
     
 def rn_cmp(infile: str, outfile: str):
     global SYMTABLE
+    global ORIGIN   
     """
         Essentially a function that gathers all the steps in the compilation process
 
@@ -136,6 +401,16 @@ def rn_cmp(infile: str, outfile: str):
     sanitized: list = []
     with open(infile, "r") as f:
         for line in f:
+            if line.startswith("."):
+                if line.startswith(".org"):
+                    ORIGIN = int(line.split(" ")[1][1:], 16)
+                continue
+
+            if any((line.strip() == "",
+                   line.startswith(";"),
+                   line.startswith("\n"))):
+                continue
+
             san = sanitize(line)
             if san != [""]:
                 sanitized.append(san)
@@ -145,10 +420,13 @@ def rn_cmp(infile: str, outfile: str):
     print("Symbol Table:")
     for k in SYMTABLE.keys():
         print(f"\t{k} : {SYMTABLE[k]}")
+    print(sanitized)
 
     preprocess(sanitized)
 
     print(sanitized)
+
+    write_bytes(sanitized, outfile)
 
 
 

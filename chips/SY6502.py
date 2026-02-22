@@ -53,9 +53,9 @@ class SY6502():
             0x29: self._and_i,
             0x2d: self._and_a,
             0x25: self._and_zp,
-            0x65: self._adc_zp,
-            0xf0: self._beq,
+            0xef: self._beq,
             0x30: self._bmi,
+            0xd0: self._bne, 
             0x10: self._bpl,
             0x00: self._brk,
             0x70: self._bvs,
@@ -309,6 +309,20 @@ class SY6502():
         regp = self.reg_P.state
         
         if regp[0] == False and regp[6] == False:
+            self.__increment_addr_reg(addr_offset-1)
+
+    def _bne(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        
+        ccb()
+        
+        addr_offset = self.data_bus.state.copy()
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        
+        regp = self.reg_P.state
+        
+        if regp[0] == True and regp[6] == True:
             self.__increment_addr_reg(addr_offset-1)
             
     def _bvs(self, ccb):
