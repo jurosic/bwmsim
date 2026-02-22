@@ -148,22 +148,22 @@ def _inst_to_byte(inst: list[str], pos=0):
         
         case "BEQ":
             print(f"Calculating relative address for {inst[1]} at position {pos} with origin {ORIGIN}")
-            return [INST_TABLE["BEQ"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
-        
+            return [INST_TABLE["BEQ"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
+         
         case "BMI":
-            return [INST_TABLE["BMI"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+            return [INST_TABLE["BMI"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
         
         case "BNE":
-            return [INST_TABLE["BNE"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+            return [INST_TABLE["BNE"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
         
         case "BPL":
-            return [INST_TABLE["BPL"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+            return [INST_TABLE["BPL"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
         
         case "BRK":
             return [INST_TABLE["BRK"]["imp"]]
         
         case "BVS":
-            return [INST_TABLE["BVS"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos]
+            return [INST_TABLE["BVS"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
         
         case "CLC":
             return [INST_TABLE["CLC"]["imp"]]
@@ -318,8 +318,9 @@ def symbolize(prog: list[list[str]]):
     #check for start, more efficient this way than uppering or lowering
     if "start" not in SYMTABLE.keys() and "START" not in SYMTABLE.keys():
         raise StartUndefined("The program has no start!")
-    
+
 def preprocess(prog: list[list[str]]):
+    global SYMTABLE
     """
         Replaces things like variable names or labels with memory locations
 
@@ -329,22 +330,36 @@ def preprocess(prog: list[list[str]]):
     
     byte_cnter = 0
    
-    #shift all symtables after the byte_cnter to account for the fact that the instructions will be converted to bytes
-
+    #first we shift
     for inst in prog:
-        l = 0
         for i in range(len(inst)):
             if inst[i] in SYMTABLE.keys():
-                inst[i] = str(SYMTABLE[inst[i]])
-                l += inst[i].count("$") * 2 #account for the fact that the symbol will be converted to bytes
-                l += inst[i].count("#") * 1 #account for the fact that the symbol will be converted to bytes
+                #if the inst is a branch, this is before relative addresses
+                #are calculated, so we need to add an exception for them
+                if '$' in SYMTABLE[inst[i]] and inst[0].upper() not in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+                    #some args are 2 bytes
+                    byte_cnter += 1
+                    print(f"Symbol {SYMTABLE[inst[i]]} is a memory address, adding 1 to instruction length")
+                    #we need to offset labels to account for this 
+                    for k in SYMTABLE.keys():
+                        if int(SYMTABLE[k][1:], 16) > byte_cnter + ORIGIN:
+                            print(f"{byte_cnter} + {ORIGIN} + {1} = {byte_cnter + ORIGIN + 1}")
+                            print(f"Shifting symbol {k} from {SYMTABLE[k]} to ", end="")
+                            print(f"{'$' + str(hex(int(SYMTABLE[k][1:], 16) + 1))[2:].upper()} because it is after the current instruction")
+                            SYMTABLE[k] = "$" + str(hex(int(SYMTABLE[k][1:], 16) + 1))[2:].upper()
+        byte_cnter += len(inst)
 
-        for k in SYMTABLE.keys():    
-            if int(SYMTABLE[k][1:], 16) > byte_cnter + ORIGIN:
-                SYMTABLE[k] = "$" + str(hex(int(SYMTABLE[k][1:], 16) + l))[2:].upper()
-
-        byte_cnter += l
-
+    byte_cnter = 0
+    #now we replace
+    for inst in prog:
+        for i in range(len(inst)):
+            if inst[i] in SYMTABLE.keys():
+                print(f"Replacing symbol {inst[i]} with {SYMTABLE[inst[i]]}")
+                inst[i] = SYMTABLE[inst[i]]
+   
+    print("Symbol table after preprocessing:")
+    for k in SYMTABLE.keys():
+        print(f"\t{k} : {SYMTABLE[k]}")
 
     #convert instructions to bytes
     byte_cnter = 0
@@ -425,6 +440,7 @@ def rn_cmp(infile: str, outfile: str):
     preprocess(sanitized)
 
     print(sanitized)
+    print(SYMTABLE)
 
     write_bytes(sanitized, outfile)
 
