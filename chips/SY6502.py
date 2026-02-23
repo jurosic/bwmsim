@@ -144,25 +144,30 @@ class SY6502():
         }
         
     def _adc(self, val, reg_val):
-        val = int(''.join(['1' if x else '0' for x in val]), 2)
-        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
+        carry = 1 if self.reg_P.state[7] else 0
+        val_int = int(''.join(['1' if x else '0' for x in val]), 2)
+        acc_int = int(''.join(['1' if x else '0' for x in reg_val]), 2)
         
-        reg_val += val
+        res = acc_int + val_int + carry
         
-        #simulate overflow
-        if reg_val > 255:
-            regp = self.reg_P.state
-            regp[1] = True
-            self.reg_P.signal(regp)
-            reg_val -= 255
-            
-        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
-        #paaaad :((
-        pad = [False for _ in range(8-len(reg_val))]
-        pad.extend(reg_val)
+        regp = self.reg_P.state
         
-        self.reg_ACC.signal(pad)
+        regp[7] = res > 255
         
+        regp[6] = (res & 0xFF) == 0
+        
+        regp[1] = bool((acc_int ^ res) & (val_int ^ res) & 0x80)
+        regp[0] = bool(res & 0x80)
+
+        self.reg_P.signal(regp)
+        
+        res &= 0xFF
+        
+        res_bin_str = bin(res)[2:].zfill(8)
+        pad = [True if x == '1' else False for x in res_bin_str]
+        
+        self.reg_ACC.signal(pad) 
+
     def _adc_i(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -321,6 +326,9 @@ class SY6502():
         
         regp = self.reg_P.state
         regp[7] = bool(val & 0b10000000)
+        #update zero and negative flags
+        regp[6] = val == 0
+        regp[0] = bool((val << 1) & 0b10000000)
         self.reg_P.signal(regp)
         
         val <<= 1
@@ -371,6 +379,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _asl_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -391,6 +403,10 @@ class SY6502():
         res = self._asl(val)
         
         self.data_bus.signal(res)
+
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
 
     def _beq(self, ccb):
         self.__increment_addr_reg()
@@ -486,8 +502,8 @@ class SY6502():
 
         regp = self.reg_P.state
         
-        if regp[0] == True and regp[6] == False:
-            self.__increment_addr_reg(addr_offset-1)
+        if regp[0] == True:
+            self.__increment_addr_reg(addr_offset)
         
     def _bpl(self, ccb):
         self.__increment_addr_reg()
@@ -502,8 +518,8 @@ class SY6502():
         
         regp = self.reg_P.state
         
-        if regp[0] == False and regp[6] == False:
-            self.__increment_addr_reg(addr_offset-1)
+        if regp[0] == False: 
+            self.__increment_addr_reg(addr_offset)
 
     def _bne(self, ccb):
         self.__increment_addr_reg()
@@ -519,7 +535,7 @@ class SY6502():
         regp = self.reg_P.state
         
         if regp[6] == False:
-            self.__increment_addr_reg(addr_offset-1)        
+            self.__increment_addr_reg(addr_offset)        
         
     def _brk(self, ccb):
         self.run = False
@@ -538,7 +554,7 @@ class SY6502():
         regp = self.reg_P.state
         
         if regp[1] == False:
-            self.__increment_addr_reg(addr_offset-1)
+            self.__increment_addr_reg(addr_offset)
 
     def _bvs(self, ccb):
         self.__increment_addr_reg()
@@ -554,7 +570,7 @@ class SY6502():
         regp = self.reg_P.state
         
         if regp[1] == True:
-            self.__increment_addr_reg(addr_offset-1)
+            self.__increment_addr_reg(addr_offset)
 
         
     def _clc(self, ccb):
@@ -577,7 +593,7 @@ class SY6502():
     
     def _cmp(self, val, reg_val):
         regp = self.reg_P.state
-        if val > reg_val:
+        if reg_val > val:
             regp[0] = False
             regp[6] = False
         
@@ -585,7 +601,7 @@ class SY6502():
             regp[0] = False
             regp[6] = True
             
-        if val < reg_val:
+        if reg_val < val:
             regp[0] = True
             regp[6] = False
             
@@ -665,7 +681,7 @@ class SY6502():
 
     def _cpx(self, val, reg_val):
         regp = self.reg_P.state
-        if val > reg_val:
+        if reg_val > val:
             regp[0] = False
             regp[6] = False
         
@@ -673,7 +689,7 @@ class SY6502():
             regp[0] = False
             regp[6] = True
             
-        if val < reg_val:
+        if reg_val < val:
             regp[0] = True
             regp[6] = False
             
@@ -752,7 +768,7 @@ class SY6502():
 
     def _cpy(self, val, reg_val):
         regp = self.reg_P.state
-        if val > reg_val:
+        if reg_val > val:
             regp[0] = False
             regp[6] = False
         
@@ -760,7 +776,7 @@ class SY6502():
             regp[0] = False
             regp[6] = True
             
-        if val < reg_val:
+        if reg_val < val:
             regp[0] = True
             regp[6] = False
             
@@ -842,7 +858,13 @@ class SY6502():
         
         val -= 1
         val &= 0b11111111
-        
+       
+        #update zero and negative flags
+        regp = self.reg_P.state
+        regp[6] = val == 0
+        regp[0] = bool(val & 0b10000000)
+        self.reg_P.signal(regp)
+
         val = [True if x == '1' else False for x in bin(val)[2:]]
         #paaaad :((
         pad = [False for _ in range(8-len(val))]
@@ -887,6 +909,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _dec_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -907,6 +933,10 @@ class SY6502():
         res = self._dec(val)
         
         self.data_bus.signal(res)
+
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
 
     def _eor(self, val, reg_val): 
         val = int(''.join(['1' if x else '0' for x in val]), 2)
@@ -995,6 +1025,12 @@ class SY6502():
         
         val += 1
         val &= 0b11111111
+
+        #update zero and negative flags
+        regp = self.reg_P.state
+        regp[6] = val == 0
+        regp[0] = bool(val & 0b10000000)
+        self.reg_P.signal(regp)
         
         val = [True if x == '1' else False for x in bin(val)[2:]]
         #paaaad :((
@@ -1040,6 +1076,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _inc_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -1061,7 +1101,9 @@ class SY6502():
         
         self.data_bus.signal(res)
 
-
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
 
     def _jmp_a(self, ccb):
         self.__increment_addr_reg()
@@ -1099,60 +1141,46 @@ class SY6502():
     def _jsr_a(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
-        
         ccb()
-        
-        addr1 = self.data_bus.state.copy()
-        #ppppadad
-        pad = [False for _ in range(16-len(addr1))]
-        pad.extend(addr1)
+        addr_low = self.data_bus.state.copy()
 
         self.__increment_addr_reg()
         self.__push_addr_bus()
-
         ccb()
+        addr_high = self.data_bus.state.copy()
 
-        addr2 = self.data_bus.state.copy()
-        #ppppadad
-        pad = [False for _ in range(16-len(addr2))]
-        pad.extend(addr2)
+        sp = int(''.join(['1' if x else '0' for x in self.reg_S.state]), 2)
 
-        addr = []
-        addr.extend(addr2)
-        addr.extend(addr1)
-
-        self.addr_bus.signal(addr)
-
-        ccb()
-
-        #push return address to stack
-        ret_addr = int(''.join(['1' if x else '0' for x in self.reg_PCL.state]), 2)+1
-        ret_addr = [True if x == '1' else False for x in bin(ret_addr)[2:]]
-        #pad... again :(
-        pad = [False for _ in range(8-len(ret_addr))]
-        pad.extend(ret_addr)
+        stack_addr_high = 0x0100 + sp
+        stack_addr_high_bin = [True if x == '1' else False for x in bin(stack_addr_high)[2:].zfill(16)]
         
-        sp = int(''.join('1' if x else '0' for x in self.reg_S.state), 2)
-        addr = int("0x0100", 16) + sp
-        addr = [True if x == '1' else False for x in bin(addr)[2:]]
-        #papapapapapd
-        pad2 = [False for _ in range(16-len(addr))]
-        pad2.extend(addr)
-        
-        self.addr_bus.signal(pad2)
-        
-        sp -= 1
-        sp = [True if x == '1' else False for x in bin(sp)[2:]]
-        #pad... again :(
-        pad3 = [False for _ in range(8-len(sp))]
-        pad3.extend(sp)
-        
-        self.reg_S.signal(pad3)
-        
+        self.addr_bus.signal(stack_addr_high_bin)
+        self.data_bus.signal(self.reg_PCH.state.copy())
         self.rw.signal(False)
-        
-        self.data_bus.signal(pad)
         ccb()
+        
+        sp = (sp - 1) & 0xFF
+
+        stack_addr_low = 0x0100 + sp
+        stack_addr_low_bin = [True if x == '1' else False for x in bin(stack_addr_low)[2:].zfill(16)]
+        
+        self.addr_bus.signal(stack_addr_low_bin)
+        self.data_bus.signal(self.reg_PCL.state.copy())
+        self.rw.signal(False)
+        ccb()
+        
+        sp = (sp - 1) & 0xFF 
+
+        sp_bin = [True if x == '1' else False for x in bin(sp)[2:].zfill(8)]
+        self.reg_S.signal(sp_bin)
+        
+        self.rw.signal(True)
+
+        self.reg_PCL.signal(addr_low)
+        self.reg_PCH.signal(addr_high)
+
+        #cheeky ;)
+        self.__increment_addr_reg(-1)
 
     def _lda_i(self, ccb):
         self.__increment_addr_reg()
@@ -1162,6 +1190,12 @@ class SY6502():
         
         #read data into ACC
         self.reg_ACC.signal(self.data_bus.state.copy())
+
+        #reset regp
+        regp = self.reg_P.state
+        regp[0] = self.reg_ACC.state[7] #negative flag
+        regp[1] = self.reg_ACC.state == [False for _ in range(8)] #zero flag
+        self.reg_P.signal(regp)
 
     def _lda_a(self, ccb):
         self.__increment_addr_reg()
@@ -1194,6 +1228,12 @@ class SY6502():
         ccb()
 
         self.reg_ACC.signal(self.data_bus.state.copy())
+
+        #reset regp
+        regp = self.reg_P.state
+        regp[0] = self.reg_ACC.state[7] #negative flag
+        regp[1] = self.reg_ACC.state == [False for _ in range(8)] #zero flag
+        self.reg_P.signal(regp)
         
     def _lda_zp(self, ccb):
         self.__increment_addr_reg()
@@ -1209,6 +1249,12 @@ class SY6502():
         self.addr_bus.signal(pad)
         ccb()
         self.reg_ACC.signal(self.data_bus.state.copy())
+
+        #reset regp
+        regp = self.reg_P.state
+        regp[0] = self.reg_ACC.state[7] #negative flag
+        regp[1] = self.reg_ACC.state == [False for _ in range(8)] #zero flag
+        self.reg_P.signal(regp)
         
     def _ldx_i(self, ccb):
         self.__increment_addr_reg()
@@ -1374,6 +1420,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _lsr_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -1394,6 +1444,10 @@ class SY6502():
         res = self._lsr(val)
         
         self.data_bus.signal(res)
+
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
 
     def _nop(self, ccb):
         pass #lol
@@ -1578,20 +1632,22 @@ class SY6502():
         self.reg_P.signal(self.data_bus.state)
 
     def _rol(self, val):
-        val = int(''.join(['1' if x else '0' for x in val]), 2)
-        
+        bb = val[0] #bit that will be rotated around
+
         regp = self.reg_P.state
-        regp[7] = bool(val & 0b10000000)
+        val.pop(0)
+        val.append(regp[7]) #carry flag
+        regp[7] = bb #carry flag
+
+        #update other flags
+        #zero flag
+        regp[6] = val == [False for _ in range(8)]
+        #negative flag
+        regp[0] = val[7]
+
         self.reg_P.signal(regp)
-        
-        val <<= 1
-        
-        val = [True if x == '1' else False for x in bin(val)[2:]]
-        #paaaad :((
-        pad = [False for _ in range(8-len(val))]
-        pad.extend(val)
-        
-        return pad
+
+        return val
 
     def _rol_a(self, ccb):
         self.__increment_addr_reg()
@@ -1630,6 +1686,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _rol_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -1651,21 +1711,20 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _ror(self, val):
-        val = int(''.join(['1' if x else '0' for x in val]), 2)
-        
+        bb = val[7] #bit that will be rotated around
+
         regp = self.reg_P.state
-        regp[7] = bool(val & 0b00000001)
+        val.pop()
+        val.insert(0, bb)
+        regp[7] = bb #carry flag
         self.reg_P.signal(regp)
-        
-        val >>= 1
-        
-        val = [True if x == '1' else False for x in bin(val)[2:]]
-        #paaaad :((
-        pad = [False for _ in range(8-len(val))]
-        pad.extend(val)
-        
-        return pad
+
+        return val
 
     def _ror_a(self, ccb):
         self.__increment_addr_reg()
@@ -1704,6 +1763,10 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _ror_zp(self, ccb): 
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -1725,16 +1788,45 @@ class SY6502():
         
         self.data_bus.signal(res)
 
+        self.rw.signal(False)
+        ccb()
+        self.rw.signal(True)
+
     def _rti(self, ccb):
-        self._plp(ccb)
-        self._pla(ccb)
-        #self.__increment_addr_reg() #not sure if this is needed?
+        raise NotImplementedError("RTI not implemented yet") #TODO
 
     def _rts(self, ccb): 
-        self._pla(ccb)
-        self._pla(ccb)
-        #self.__increment_addr_reg() #not sure if this is needed?
-        self._jmp_a(ccb)
+        # 1. Dummy read (the 6502 hardware requires this clock cycle)
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        ccb()
+
+        # 2. Get current Stack Pointer
+        sp = int(''.join(['1' if x else '0' for x in self.reg_S.state]), 2)
+
+        # 3. Pull PCL from Stack
+        sp = (sp + 1) & 0xFF
+        stack_addr_low = 0x0100 + sp
+        self.addr_bus.signal([True if x == '1' else False for x in bin(stack_addr_low)[2:].zfill(16)])
+        ccb()
+        addr_low = self.data_bus.state.copy()
+
+        # 4. Pull PCH from Stack
+        sp = (sp + 1) & 0xFF
+        stack_addr_high = 0x0100 + sp
+        self.addr_bus.signal([True if x == '1' else False for x in bin(stack_addr_high)[2:].zfill(16)])
+        ccb()
+        addr_high = self.data_bus.state.copy()
+
+        # 5. Save updated Stack Pointer
+        self.reg_S.signal([True if x == '1' else False for x in bin(sp)[2:].zfill(8)])
+
+        # 6. Restore the Program Counter!
+        # Because your JSR correctly pushed Target - 1 (0x8010), 
+        # and your engine pre-increments before the next fetch, 
+        # setting it to exactly what we pulled will perfectly land on 0x8011!
+        self.reg_PCL.signal(addr_low)
+        self.reg_PCH.signal(addr_high)
 
     def _sbc(self, val, reg_val):
         val = int(''.join(['1' if x else '0' for x in val]), 2)

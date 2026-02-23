@@ -100,7 +100,7 @@ def _inst_to_byte(inst: list[str], pos=0):
         return [INST_TABLE[inst_name]["imp"]]
     elif len(inst) == 2:
         #not a very robust way to check for rel addresses.
-        if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+        if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC"]:
             #relative
             offset = int(inst[1][1:], 16) - pos - ORIGIN  # +2 because the instruction is 2 bytes long
             print(f"Calculating relative offset for {inst[1]}: {int(inst[1][1:], 16)} - {pos} - {ORIGIN} = {offset}")
@@ -230,7 +230,6 @@ def preprocess(prog: list[list[str]]):
         prog (list[list[str]]): 
     """
     
-    byte_cnter = 0
     #now we replace
     for inst in prog:
         for i in range(len(inst)):
@@ -238,13 +237,11 @@ def preprocess(prog: list[list[str]]):
                 print(f"Replacing symbol {inst[i]} with {SYMTABLE[inst[i]]}")
                 inst[i] = SYMTABLE[inst[i]]
    
-    print("Symbol table after preprocessing:")
-    for k in SYMTABLE.keys():
-        print(f"\t{k} : {SYMTABLE[k]}")
-
     #convert instructions to bytes
     byte_cnter = 0
     for i in range(len(prog)):
+        if prog[i][0].endswith(":"):
+            continue #if by SOME CHANCE there are still labels, skip them
         #handle possible absolute args for byte_cnter
         if len(prog[i]) > 1:
             if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
