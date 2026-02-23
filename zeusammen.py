@@ -28,95 +28,55 @@ ORIGIN = 0x0000
 SYMTABLE = {}
 
 INST_TABLE = {
-        "ADC": {
-            "imm": 0x69,
-            "zp": 0x65,
-            "abs": 0x6D
-        },
-        "AND": {
-            "imm": 0x29,
-            "zp": 0x25,
-            "abs": 0x2D
-        },
-        "BEQ": {
-            "rel": 0xEF
-        },
-        "BMI": {
-            "rel": 0x30
-        },
-        "BNE": {
-            "rel": 0xD0
-        },
-        "BPL": {
-            "rel": 0x10
-        },
-        "BRK": {
-            "imp": 0x00
-        },
-        "BVS": {
-            "rel": 0x70
-        },
-        "CLC": {
-            "imp": 0x18
-        },
-        "CLD": {
-            "imp": 0xD8
-        },
-        "CLI": {
-            "imp": 0x58
-        },
-        "CLV": {
-            "imp": 0xB8
-        },
-        "CMP": {
-            "imm": 0xC9,
-            "zp": 0xC5
-        },
-        "CPX": {
-            "imm": 0xE0
-        }, "CPY": {
-            "imm": 0xC0
-        },
-        "JMP": {
-            "abs": 0x4C
-        },
-        "LDA": {
-            "imm": 0xA9,
-            "zp": 0xA5
-        },
-        "LDX": {
-            "imm": 0xA2,
-            "zp": 0xA6
-        },
-        "LDY": {
-            "imm": 0xA0
-        },
-        "PHA": {
-            "imp": 0x48
-        },
-        "PLA": {
-            "imp": 0x68
-        },
-        "STA": {
-            "zp": 0x85
-        },
-        "STX": {
-            "zp": 0x86
-        },
-        "TAX": {
-            "imp": 0xAA
-        },
-        "TAY": {
-            "imp": 0xA8
-        },
-        "TXA": {
-            "imp": 0x8A
-        },
-        "TYA": {
-            "imp": 0x98
-        }
-}        
-
+        "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65 },
+        "AND": { "imm": 0x29, "abs": 0x2d, "zp": 0x25 },
+        "ASL": { "abs": 0x0e, "zp": 0x06 },
+        "BEQ": { "rel": 0xef },
+        "BIT": { "abs": 0x2c, "zp": 0x24 },
+        "BMI": { "rel": 0x30 },
+        "BNE": { "rel": 0xd0 },
+        "BPL": { "rel": 0x10 },
+        "BRK": { "imp": 0x00 },
+        "BVC": { "rel": 0x50 },
+        "BVS": { "rel": 0x70 },
+        "CLC": { "imp": 0x18 },
+        "CLD": { "imp": 0xd8 },
+        "CLI": { "imp": 0x58 },
+        "CLV": { "imp": 0xB8 },
+        "CMP": { "imm": 0xc9, "abs": 0xcd, "zp": 0xc5 },
+        "CPX": { "imm": 0xe0, "abs": 0xce, "zp": 0xe4 },
+        "CPY": { "imm": 0xc0, "abs": 0xcc, "zp": 0xe4 },
+        "DEC": { "abs": 0xce, "zp": 0xc6 },
+        "EOR": { "imm": 0x49, "abs": 0x4d, "zp": 0x45 },
+        "INC": { "abs": 0xee, "zp": 0xe6 },
+        "JMP": { "abs": 0x4c },
+        "JSR": { "abs": 0x20 },
+        "LDA": { "imm": 0xa9, "abs": 0xad, "zp": 0xa5 },
+        "LDX": { "imm": 0xa2, "abs": 0xae, "zp": 0xa6 },
+        "LDY": { "imm": 0xa0, "abs": 0xac, "zp": 0xa4 },
+        "LSR": { "abs": 0x4e, "zp": 0x46 },
+        "NOP": { "imp": 0xea },
+        "ORA": { "imm": 0x09, "abs": 0x0d, "zp": 0x05 },
+        "PHA": { "imp": 0x48 },
+        "PHP": { "imp": 0x08 },
+        "PLA": { "imp": 0x68 },
+        "PLP": { "imp": 0x28 },
+        "ROL": { "abs": 0x2e, "zp": 0x26 },
+        "ROR": { "abs": 0x6e, "zp": 0x66 },
+        "RTI": { "imp": 0x40 },
+        "RTS": { "imp": 0x60 },
+        "SBC": { "imm": 0xe9, "abs": 0xed, "zp": 0xe5 },
+        "SEC": { "imp": 0x38 },
+        "SED": { "imp": 0xf8 },
+        "SEI": { "imp": 0x78 },
+        "STA": { "abs": 0x8d, "zp": 0x85 },
+        "STX": { "abs": 0x8e, "zp": 0x86 },
+        "STY": { "abs": 0x8c, "zp": 0x84 },
+        "TAX": { "imp": 0xaa },
+        "TAY": { "imp": 0xa8 },
+        "TXA": { "imp": 0x8a },
+        "TYA": { "imp": 0x98 },
+    }
 
 
 class StartUndefined(Exception):
@@ -130,110 +90,33 @@ def _inst_to_byte(inst: list[str], pos=0):
         inst (list[str]): instruction to be converted
     """
     
-    match inst[0].upper():
-        case "ADC":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["ADC"]["imm"], int(inst[1][1:], 16)]
-            elif inst[1].startswith("$"):
-                return [INST_TABLE["ADC"]["abs"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["ADC"]["zp"], int(inst[1], 16)]
-        
-        case "AND":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["AND"]["imm"], int(inst[1][1:], 16)]
-            elif inst[1].startswith("$"):
-                return [INST_TABLE["AND"]["abs"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["AND"]["zp"], int(inst[1], 16)]
-        
-        case "BEQ":
-            print(f"Calculating relative address for {inst[1]} at position {pos} with origin {ORIGIN}")
-            return [INST_TABLE["BEQ"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
-         
-        case "BMI":
-            return [INST_TABLE["BMI"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
-        
-        case "BNE":
-            return [INST_TABLE["BNE"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
-        
-        case "BPL":
-            return [INST_TABLE["BPL"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
-        
-        case "BRK":
-            return [INST_TABLE["BRK"]["imp"]]
-        
-        case "BVS":
-            return [INST_TABLE["BVS"]["rel"], int(inst[1][1:], 16) - ORIGIN - pos + 1]
-        
-        case "CLC":
-            return [INST_TABLE["CLC"]["imp"]]
-        
-        case "CLD":
-            return [INST_TABLE["CLD"]["imp"]]
-        
-        case "CLI":
-            return [INST_TABLE["CLI"]["imp"]]
-        
-        case "CLV":
-            return [INST_TABLE["CLV"]["imp"]]
-        
-        case "CMP":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["CMP"]["imm"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["CMP"]["zp"], int(inst[1], 16)]
-        
-        case "CPX":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["CPX"]["imm"], int(inst[1][1:], 16)]
-        case "CPY":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["CPY"]["imm"], int(inst[1][1:], 16)]
-        case "JMP":
-            if inst[1].startswith("$"):
-                return [INST_TABLE["JMP"]["abs"], int(inst[1][1:], 16)]
-        case "LDA":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["LDA"]["imm"], int(inst[1][1:], 16)]
-            elif inst[1].startswith("$"):
-                return [INST_TABLE["LDA"]["abs"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["LDA"]["zp"], int(inst[1], 16)]
-        case "LDX":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["LDX"]["imm"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["LDX"]["zp"], int(inst[1], 16)]
-        case "LDY":
-            if inst[1].startswith("#"):
-                return [INST_TABLE["LDY"]["imm"], int(inst[1][1:], 16)]
-        case "PHA":
-            return [INST_TABLE["PHA"]["imp"]]
-        case "PLA":
-            return [INST_TABLE["PLA"]["imp"]]
-        case "STA":
-            if inst[1].startswith("$"):
-                return [INST_TABLE["STA"]["abs"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["STA"]["zp"], int(inst[1], 16)]
-        case "STX":
-            if inst[1].startswith("$"):
-                return [INST_TABLE["STX"]["abs"], int(inst[1][1:], 16)]
-            else:
-                return [INST_TABLE["STX"]["zp"], int(inst[1], 16)]
-        case "TAX":
-            return [INST_TABLE["TAX"]["imp"]]
-        case "TAY":
-            return [INST_TABLE["TAY"]["imp"]]
-        case "TXA":
-            return [INST_TABLE["TXA"]["imp"]]
-        case "TYA":
-            return [INST_TABLE["TYA"]["imp"]]
-        case _:
-            print(f"Unknown instruction: {inst[0]}")
-            raise Exception("Unknown instruction")
-            
+    if inst[0].upper() not in INST_TABLE.keys():
+        print(f"Invalid instruction {inst[0]}")
+        exit(1)
+
+    inst_name = inst[0].upper()
+    if len(inst) == 1:
+        #implied
+        return [INST_TABLE[inst_name]["imp"]]
+    elif len(inst) == 2:
+        #not a very robust way to check for rel addresses.
+        if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+            #relative
+            offset = int(inst[1][1:], 16) - pos - ORIGIN  # +2 because the instruction is 2 bytes long
+            print(f"Calculating relative offset for {inst[1]}: {int(inst[1][1:], 16)} - {pos} - {ORIGIN} = {offset}")
+            return [INST_TABLE[inst_name]["rel"], offset]
+        elif inst[1].startswith("#"):
+            #immediate
+            return [INST_TABLE[inst_name]["imm"], int(inst[1][1:], 16)]
+        elif inst[1].startswith("$"):
+            #absolute
+            return [INST_TABLE[inst_name]["abs"], int(inst[1][1:], 16) & 0xFF, (int(inst[1][1:], 16) >> 8) & 0xFF]
+        else:
+            #zero page
+            return [INST_TABLE[inst_name]["zp"], int(inst[1], 16)]
+    else:
+        print(f"Invalid instruction format for {inst}")
+        exit(1)            
 
 
 def _argsan(args: list[str]):
@@ -298,12 +181,28 @@ def symbolize(prog: list[list[str]]):
     
     byte_ctr: int = 0
     
+    #pass 1
     for inst in prog:
         if inst[0].endswith(":"):
             #symbol definiton here
             SYMTABLE[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
+        elif inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+            #relative branch, 2 bytes
+            byte_ctr += 2
+        elif inst[0].upper() in ["JMP", "JSR"]:
+            #absolute jump, 3 bytes
+            byte_ctr += 3
         else:
-            byte_ctr += len(inst)
+            #add instruction byte
+            byte_ctr += 1
+            #check length of the arg (1 byte or 2 bytes)
+            if len(inst) > 1:
+                if inst[1].startswith("$"):
+                    #absolute, 2 bytes
+                    byte_ctr += 2
+                else:
+                    #zero page or immediate 1 byte
+                    byte_ctr += 1
 
     #remove any labels from the program
     plen = len(prog)
@@ -332,27 +231,6 @@ def preprocess(prog: list[list[str]]):
     """
     
     byte_cnter = 0
-   
-    #first we shift
-    for inst in prog:
-        for i in range(len(inst)):
-            if inst[i] in SYMTABLE.keys():
-                #if the inst is a branch, this is before relative addresses
-                #are calculated, so we need to add an exception for them
-                if '$' in SYMTABLE[inst[i]] and inst[0].upper() not in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
-                    #some args are 2 bytes
-                    byte_cnter += 1
-                    print(f"Symbol {SYMTABLE[inst[i]]} is a memory address, adding 1 to instruction length")
-                    #we need to offset labels to account for this 
-                    for k in SYMTABLE.keys():
-                        if int(SYMTABLE[k][1:], 16) > byte_cnter + ORIGIN:
-                            print(f"{byte_cnter} + {ORIGIN} + {1} = {byte_cnter + ORIGIN + 1}")
-                            print(f"Shifting symbol {k} from {SYMTABLE[k]} to ", end="")
-                            print(f"{'$' + str(hex(int(SYMTABLE[k][1:], 16) + 1))[2:].upper()} because it is after the current instruction")
-                            SYMTABLE[k] = "$" + str(hex(int(SYMTABLE[k][1:], 16) + 1))[2:].upper()
-        byte_cnter += len(inst)
-
-    byte_cnter = 0
     #now we replace
     for inst in prog:
         for i in range(len(inst)):
@@ -367,8 +245,15 @@ def preprocess(prog: list[list[str]]):
     #convert instructions to bytes
     byte_cnter = 0
     for i in range(len(prog)):
-        byte_cnter += len(prog[i])
+        #handle possible absolute args for byte_cnter
+        if len(prog[i]) > 1:
+            if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+                byte_cnter += 2
+            else:
+                byte_cnter += 1
+        byte_cnter += 1
         prog[i] = _inst_to_byte(prog[i], byte_cnter)
+
 
 def write_bytes(prog: list[list[int]], outfile: str):
     """

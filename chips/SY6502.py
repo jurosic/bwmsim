@@ -114,7 +114,7 @@ class SY6502():
             0xe9: self._sbc_i,
             0xed: self._sbc_a,
             0xe5: self._sbc_zp,
-            0x32: self._sec,
+            0x38: self._sec,
             0xf8: self._sed,
             0x78: self._sei,
             0x8d: self._sta_a,
@@ -1952,7 +1952,6 @@ class SY6502():
         ccb()
         
         self.rw.signal(True)
-        #self.reg_X.signal([False for _ in range(8)])
 
     def _sty_a(self, ccb):
         self.__increment_addr_reg()
@@ -2010,7 +2009,6 @@ class SY6502():
         ccb()
         
         self.rw.signal(True)
-        #self.reg_Y.signal([False for _ in range(8)])
         
     def _tax(self, ccb):
         self.reg_X.signal(self.reg_ACC.state.copy())
