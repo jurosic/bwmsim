@@ -49,5 +49,9 @@ if __name__ == "__main__":
 
     while cpu.run:
         cpu.update(cb)
-        ram.show("0x01F0", "0x01FF")
+        print("Stack:")
+        ram.show("0x01F0", "0x0200")
+        print("ZP:")
+        ram.show("0x0010", "0x001F")
+        ram.show("0x002F", "0x0031")
         input()
