@@ -53,30 +53,76 @@ class SY6502():
             0x29: self._and_i,
             0x2d: self._and_a,
             0x25: self._and_zp,
+            0x0e: self._asl_a,
+            0x06: self._asl_zp,
             0xef: self._beq,
+            0x2c: self._bit_a,
+            0x24: self._bit_zp,
             0x30: self._bmi,
             0xd0: self._bne, 
             0x10: self._bpl,
             0x00: self._brk,
+            0x50: self._bvc,
             0x70: self._bvs,
             0x18: self._clc,
             0xd8: self._cld,
             0x58: self._cli,
             0xB8: self._clv,
             0xc9: self._cmp_i,
+            0xcd: self._cmp_a,
             0xc5: self._cmp_zp,
             0xe0: self._cpx_i,
+            0xce: self._cpx_a,
+            0xe4: self._cpx_zp,
             0xc0: self._cpy_i,
+            0xcc: self._cpy_a,
+            0xe4: self._cpy_zp,
+            0xce: self._dec_a,
+            0xc6: self._dec_zp,
+            0x49: self._eor_i,
+            0x4d: self._eor_a,
+            0x45: self._eor_zp,
+            0xee: self._inc_a,
+            0xe6: self._inc_zp,
             0x4c: self._jmp_a,
+            0x20: self._jsr_a,
             0xa9: self._lda_i,
+            0xad: self._lda_a,
             0xa5: self._lda_zp,
             0xa2: self._ldx_i,
+            0xae: self._ldx_a,
             0xa6: self._ldx_zp,
             0xa0: self._ldy_i,
+            0xac: self._ldy_a,
+            0xa4: self._ldy_zp,
+            0x4e: self._lsr_a,
+            0x46: self._lsr_zp,
+            0xea: self._nop,
+            0x09: self._ora_i,
+            0x0d: self._ora_a,
+            0x05: self._ora_zp,
             0x48: self._pha,
+            0x08: self._php,
             0x68: self._pla,
+            0x28: self._plp,
+            0x2e: self._rol_a,
+            0x26: self._rol_zp,
+            0x6e: self._ror_a,
+            0x66: self._ror_zp,
+            0x40: self._rti,
+            0x60: self._rts,
+            0xe9: self._sbc_i,
+            0xed: self._sbc_a,
+            0xe5: self._sbc_zp,
+            0x32: self._sec,
+            0xf8: self._sed,
+            0x78: self._sei,
+            0x8d: self._sta_a,
             0x85: self._sta_zp,
+            0x8e: self._stx_a,
             0x86: self._stx_zp,
+            0x8c: self._sty_a,
+            0x84: self._sty_zp,
             0xaa: self._tax,
             0xa8: self._tay,
             0x8a: self._txa,
@@ -269,6 +315,82 @@ class SY6502():
 
         self._and(val, reg_val)
 
+    def _asl(self, val):
+        #this one makes me want to refractor the whole code
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        regp = self.reg_P.state
+        regp[7] = bool(val & 0b10000000)
+        self.reg_P.signal(regp)
+        
+        val <<= 1
+        val &= 0b11111111
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _asl_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._asl(val)
+        
+        self.data_bus.signal(res)
+
+    def _asl_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._asl(val)
+        
+        self.data_bus.signal(res)
 
     def _beq(self, ccb):
         self.__increment_addr_reg()
@@ -284,7 +406,72 @@ class SY6502():
         
         if regp[0] == False and regp[6] == True:
             self.__increment_addr_reg(addr_offset-1)
-    
+            
+    def _bit(self, val): 
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        regp = self.reg_P.state
+        regp[0] = bool(val & 0b10000000)
+        regp[1] = bool(val & 0b01000000)
+        regp[6] = bool(val & 0b00000001)
+        self.reg_P.signal(regp)
+
+    def _bit_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        self._bit(val)
+
+    def _bit_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        self._bit(val)
+
+   
     def _bmi(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -332,8 +519,27 @@ class SY6502():
         regp = self.reg_P.state
         
         if regp[6] == False:
+            self.__increment_addr_reg(addr_offset-1)        
+        
+    def _brk(self, ccb):
+        self.run = False
+
+    def _bvc(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        
+        ccb()
+        
+        addr_offset = self.data_bus.state.copy()
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
+
+        regp = self.reg_P.state
+        
+        if regp[1] == False:
             self.__increment_addr_reg(addr_offset-1)
-            
+
     def _bvs(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -349,9 +555,7 @@ class SY6502():
         
         if regp[1] == True:
             self.__increment_addr_reg(addr_offset-1)
-    
-    def _brk(self, ccb):
-        self.run = False
+
         
     def _clc(self, ccb):
         regp = self.reg_P.state
@@ -402,6 +606,43 @@ class SY6502():
         
         self._cmp(val, reg_val)
 
+    def _cmp_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._cmp(val, reg_val)
+
     def _cmp_zp(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -422,6 +663,22 @@ class SY6502():
         
         self._cmp(val, reg_val)
 
+    def _cpx(self, val, reg_val):
+        regp = self.reg_P.state
+        if val > reg_val:
+            regp[0] = False
+            regp[6] = False
+        
+        if val == reg_val:
+            regp[0] = False
+            regp[6] = True
+            
+        if val < reg_val:
+            regp[0] = True
+            regp[6] = False
+            
+        self.reg_P.signal(regp)
+
     def _cpx_i(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -434,7 +691,80 @@ class SY6502():
         val = ''.join(['1' if x else '0' for x in self.data_bus.state])
         val = int(val, 2)
         
-        self._cmp(val, reg_val)
+        self._cpx(val, reg_val)
+
+    def _cpx_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_X.state.copy()
+
+        self._cpx(val, reg_val)
+
+    def _cpx_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_X.state.copy()
+        
+        self._cpx(val, reg_val)
+
+    def _cpy(self, val, reg_val):
+        regp = self.reg_P.state
+        if val > reg_val:
+            regp[0] = False
+            regp[6] = False
+        
+        if val == reg_val:
+            regp[0] = False
+            regp[6] = True
+            
+        if val < reg_val:
+            regp[0] = True
+            regp[6] = False
+            
+        self.reg_P.signal(regp)
 
     def _cpy_i(self, ccb):
         self.__increment_addr_reg()
@@ -448,7 +778,290 @@ class SY6502():
         val = ''.join(['1' if x else '0' for x in self.data_bus.state])
         val = int(val, 2)
         
-        self._cmp(val, reg_val)
+        self._cpy(val, reg_val)
+
+    def _cpy_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_Y.state.copy()
+
+        self._cpy(val, reg_val)
+
+    def _cpy_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_Y.state.copy()
+        
+        self._cpy(val, reg_val)
+
+    def _dec(self, val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        val -= 1
+        val &= 0b11111111
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _dec_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._dec(val)
+        
+        self.data_bus.signal(res)
+
+    def _dec_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._dec(val)
+        
+        self.data_bus.signal(res)
+
+    def _eor(self, val, reg_val): 
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
+        
+        reg_val ^= val
+        
+        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(reg_val))]
+        pad.extend(reg_val)
+        
+        self.reg_ACC.signal(pad)
+
+    def _eor_i(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._eor(val, reg_val)
+
+    def _eor_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._eor(val, reg_val)
+
+    def _eor_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._eor(val, reg_val)
+
+    def _inc(self, val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        val += 1
+        val &= 0b11111111
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _inc_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._inc(val)
+        
+        self.data_bus.signal(res)
+
+    def _inc_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._inc(val)
+        
+        self.data_bus.signal(res)
+
+
 
     def _jmp_a(self, ccb):
         self.__increment_addr_reg()
@@ -482,7 +1095,65 @@ class SY6502():
         
         self.reg_PCL.signal(first)
         self.reg_PCH.signal(second)
+
+    def _jsr_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
         
+        ccb()
+        
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+        #push return address to stack
+        ret_addr = int(''.join(['1' if x else '0' for x in self.reg_PCL.state]), 2)+1
+        ret_addr = [True if x == '1' else False for x in bin(ret_addr)[2:]]
+        #pad... again :(
+        pad = [False for _ in range(8-len(ret_addr))]
+        pad.extend(ret_addr)
+        
+        sp = int(''.join('1' if x else '0' for x in self.reg_S.state), 2)
+        addr = int("0x0100", 16) + sp
+        addr = [True if x == '1' else False for x in bin(addr)[2:]]
+        #papapapapapd
+        pad2 = [False for _ in range(16-len(addr))]
+        pad2.extend(addr)
+        
+        self.addr_bus.signal(pad2)
+        
+        sp -= 1
+        sp = [True if x == '1' else False for x in bin(sp)[2:]]
+        #pad... again :(
+        pad3 = [False for _ in range(8-len(sp))]
+        pad3.extend(sp)
+        
+        self.reg_S.signal(pad3)
+        
+        self.rw.signal(False)
+        
+        self.data_bus.signal(pad)
+        ccb()
+
     def _lda_i(self, ccb):
         self.__increment_addr_reg()
         self.__push_addr_bus()
@@ -490,6 +1161,38 @@ class SY6502():
         ccb()
         
         #read data into ACC
+        self.reg_ACC.signal(self.data_bus.state.copy())
+
+    def _lda_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
         self.reg_ACC.signal(self.data_bus.state.copy())
         
     def _lda_zp(self, ccb):
@@ -513,7 +1216,38 @@ class SY6502():
         
         ccb()
         
-        #read data into ACC
+        self.reg_X.signal(self.data_bus.state.copy())
+
+    def _ldx_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
         self.reg_X.signal(self.data_bus.state.copy())
         
     def _ldx_zp(self, ccb):
@@ -539,7 +1273,213 @@ class SY6502():
         
         #read data into ACC
         self.reg_Y.signal(self.data_bus.state.copy())
+
+    def _ldy_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+        self.reg_Y.signal(self.data_bus.state.copy())
+
+    def _ldy_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
         
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        ccb()
+        self.reg_Y.signal(self.data_bus.state.copy())
+
+    def _lsr(self, val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        regp = self.reg_P.state
+        regp[7] = bool(val & 0b00000001)
+        self.reg_P.signal(regp)
+        
+        val >>= 1
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _lsr_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._lsr(val)
+        
+        self.data_bus.signal(res)
+
+    def _lsr_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._lsr(val)
+        
+        self.data_bus.signal(res)
+
+    def _nop(self, ccb):
+        pass #lol
+
+    def _ora(self, val, reg_val): 
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
+        
+        reg_val |= val
+        
+        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(reg_val))]
+        pad.extend(reg_val)
+        
+        self.reg_ACC.signal(pad)
+
+    def _ora_i(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._ora(val, reg_val)
+
+    def _ora_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._ora(val, reg_val)
+
+    def _ora_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._ora(val, reg_val)
+
     def _pha(self, ccb):
         sp = int(''.join('1' if x else '0' for x in self.reg_S.state), 2)
         addr = int("0x0100", 16) + sp
@@ -560,6 +1500,31 @@ class SY6502():
         
         self.data_bus.signal(self.reg_ACC.state.copy())
         #self.reg_ACC.signal([False for _ in range(8)])
+        
+        ccb()
+        
+        #leftover from not setting RW before
+        self.rw.signal(True)
+
+    def _php(self, ccb):
+        sp = int(''.join('1' if x else '0' for x in self.reg_S.state), 2)
+        addr = int("0x0100", 16) + sp
+        addr = [True if x == '1' else False for x in bin(addr)[2:]]
+        #papapapapapd
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        sp -= 1
+        sp = [True if x == '1' else False for x in bin(sp)[2:]]
+        #pad... again :(
+        pad = [False for _ in range(8-len(sp))]
+        pad.extend(sp)
+        self.reg_S.signal(pad)
+        
+        self.rw.signal(False)
+        
+        self.data_bus.signal(self.reg_P.state.copy())
         
         ccb()
         
@@ -588,6 +1553,330 @@ class SY6502():
         ccb()
 
         self.reg_ACC.signal(self.data_bus.state)
+
+    def _plp(self, ccb):
+        sp = int(''.join('1' if x else '0' for x in self.reg_S.state), 2)+1
+        addr = int("0x0100", 16) + sp
+        addr = [True if x == '1' else False for x in bin(addr)[2:]]
+        #ppppp
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        sp = [True if x == '1' else False for x in bin(sp)[2:]]
+        #padpadpapda..
+        pad = [False for _ in range(8-len(sp))]
+        pad.extend(sp)
+        
+        self.reg_S.signal(pad)
+        
+        self.rw.signal(True)
+        
+
+        ccb()
+
+        self.reg_P.signal(self.data_bus.state)
+
+    def _rol(self, val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        regp = self.reg_P.state
+        regp[7] = bool(val & 0b10000000)
+        self.reg_P.signal(regp)
+        
+        val <<= 1
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _rol_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._rol(val)
+        
+        self.data_bus.signal(res)
+
+    def _rol_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._rol(val)
+        
+        self.data_bus.signal(res)
+
+    def _ror(self, val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        
+        regp = self.reg_P.state
+        regp[7] = bool(val & 0b00000001)
+        self.reg_P.signal(regp)
+        
+        val >>= 1
+        
+        val = [True if x == '1' else False for x in bin(val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(val))]
+        pad.extend(val)
+        
+        return pad
+
+    def _ror_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+
+        res = self._ror(val)
+        
+        self.data_bus.signal(res)
+
+    def _ror_zp(self, ccb): 
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+
+        res = self._ror(val)
+        
+        self.data_bus.signal(res)
+
+    def _rti(self, ccb):
+        self._plp(ccb)
+        self._pla(ccb)
+        #self.__increment_addr_reg() #not sure if this is needed?
+
+    def _rts(self, ccb): 
+        self._pla(ccb)
+        self._pla(ccb)
+        #self.__increment_addr_reg() #not sure if this is needed?
+        self._jmp_a(ccb)
+
+    def _sbc(self, val, reg_val):
+        val = int(''.join(['1' if x else '0' for x in val]), 2)
+        reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
+        
+        regp = self.reg_P.state
+        if not regp[0]: #if carry is clear, subtract one more
+            val += 1
+        
+        reg_val -= val
+        
+        reg_val &= 0b11111111
+        
+        reg_val = [True if x == '1' else False for x in bin(reg_val)[2:]]
+        #paaaad :((
+        pad = [False for _ in range(8-len(reg_val))]
+        pad.extend(reg_val)
+        
+        self.reg_ACC.signal(pad)
+
+    def _sbc_i(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._sbc(val, reg_val)
+
+    def _sbc_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+
+        self._sbc(val, reg_val)
+
+    def _sbc_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        
+        ccb()
+        
+        val = self.data_bus.state.copy()
+        reg_val = self.reg_ACC.state.copy()
+        
+        self._sbc(val, reg_val)
+
+    def _sec(self, ccb):
+        regp = self.reg_P.state
+        regp[0] = True
+        self.reg_P.signal(regp)
+
+    def _sed(self, ccb):
+        regp = self.reg_P.state
+        regp[3] = True
+        self.reg_P.signal(regp)
+
+    def _sei(self, ccb):
+        regp = self.reg_P.state
+        regp[2] = True
+        self.reg_P.signal(regp)
+
+    def _sta_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        self.rw.signal(False)
+        
+        self.data_bus.signal(self.reg_ACC.state.copy())
+        
+        ccb()
+        
+        self.rw.signal(True)
         
     def _sta_zp(self, ccb):
         self.__increment_addr_reg()
@@ -606,7 +1895,45 @@ class SY6502():
         ccb()
         
         self.rw.signal(True)
-        #self.reg_ACC.signal([False for _ in range(8)])
+
+    def _stx_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        self.rw.signal(False)
+        
+        self.data_bus.signal(self.reg_X.state.copy())
+        
+        ccb()
+        
+        self.rw.signal(True)
         
     def _stx_zp(self, ccb):
         self.__increment_addr_reg()
@@ -626,6 +1953,64 @@ class SY6502():
         
         self.rw.signal(True)
         #self.reg_X.signal([False for _ in range(8)])
+
+    def _sty_a(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+
+        ccb()
+
+        addr1 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr1))]
+        pad.extend(addr1)
+
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+
+        ccb()
+
+        addr2 = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr2))]
+        pad.extend(addr2)
+
+        addr = []
+        addr.extend(addr2)
+        addr.extend(addr1)
+
+        self.addr_bus.signal(addr)
+
+        ccb()
+
+
+        self.rw.signal(False)
+        
+        self.data_bus.signal(self.reg_Y.state.copy())
+        
+        ccb()
+        
+        self.rw.signal(True)
+
+    def _sty_zp(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        self.rw.signal(True)
+        
+        ccb()
+        
+        self.rw.signal(False)
+        addr = self.data_bus.state.copy()
+        #ppppadad
+        pad = [False for _ in range(16-len(addr))]
+        pad.extend(addr)
+        self.addr_bus.signal(pad)
+        self.data_bus.signal(self.reg_Y.state.copy())
+        ccb()
+        
+        self.rw.signal(True)
+        #self.reg_Y.signal([False for _ in range(8)])
         
     def _tax(self, ccb):
         self.reg_X.signal(self.reg_ACC.state.copy())
