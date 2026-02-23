@@ -25,9 +25,9 @@ if __name__ == "__main__":
     rom.load(argv[1])
 
 
-    cpu.addr_bus.connect(rom.addr_bus, 1, (1, 16))
+    cpu.addr_bus.connect(rom.addr_bus, 1, [1, 16])
     
-    cpu.addr_bus.connect(ram.addr_bus, 1, (1, 16))
+    cpu.addr_bus.connect(ram.addr_bus, 1, [1, 16])
 
     assert(len(rom.addr_bus.connections) == 1)
     assert(len(ram.addr_bus.connections) == 1)
@@ -53,5 +53,4 @@ if __name__ == "__main__":
         ram.show("0x01F0", "0x0200")
         print("ZP:")
         ram.show("0x0010", "0x001F")
-        ram.show("0x002F", "0x0031")
         input()
