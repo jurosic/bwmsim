@@ -49,7 +49,7 @@ FIB:
 	LDA $2003
 	STA 00
 
-	JSR SEND_16
+	JSR SEND_FIB_16
 
 	;fib1 <- fib2
 	LDA 05
@@ -64,6 +64,7 @@ FIB:
 	BNE FIB
 
 FIN:
+	JSR SEND_FIN
 	LDA #FF
 	BRK
 
@@ -90,7 +91,7 @@ ADD_16:
 
 	RTS
 
-SEND_16:
+SEND_FIB_16:
 	;sends 16 bits to reserved mem
 	;to be read externaly
 	; $2010 - Low
@@ -110,3 +111,20 @@ SEND_16:
 
 	RTS
 
+SEND_FIN:
+	LDA #46
+	STA $2010
+	LDA #02
+	STA $2012
+
+	LDA #49
+	STA $2010
+	LDA #02
+	STA $2012
+
+	LDA #4E
+	STA $2010
+	LDA #82
+	STA $2012
+
+	RTS

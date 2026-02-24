@@ -20,11 +20,17 @@ def call(comp_dict):
 
         buffer.append(str(val))
 
-        if flags & 0b10000000:
-            #add newline
-            buffer.append('\n')
-        #reset flags
-        comp_dict['ram'].set_address(int("0x2012", 16), 0)
+    if flags & 0b00000010:
+        #dealing with char
+        mem = comp_dict['ram'].get_addresses((int("0x2010", 16), ))[0]
+        buffer.append(chr(mem))
+
+    if flags & 0b10000000:
+        #add newline
+        buffer.append('\n')
+
+    #reset flags
+    comp_dict['ram'].set_address(int("0x2012", 16), 0)
 
     print("Text Buffer:")
     print(''.join(buffer))
