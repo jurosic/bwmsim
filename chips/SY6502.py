@@ -47,7 +47,7 @@ class SY6502():
         self.rw    = EPin()
         
         #Internal sinumation things
-        self.__breaking = False
+        self._breaking = False
 
         self.instruction_set = {
             0x69: self._adc_i,
@@ -84,11 +84,15 @@ class SY6502():
             0xe4: self._cpy_zp,
             0xce: self._dec_a,
             0xc6: self._dec_zp,
+            0xca: self._dex,
+            0x88: self._dey,
             0x49: self._eor_i,
             0x4d: self._eor_a,
             0x45: self._eor_zp,
             0xee: self._inc_a,
             0xe6: self._inc_zp,
+            0xe8: self._inx,
+            0xc8: self._iny,
             0x4c: self._jmp_a,
             0x20: self._jsr_a,
             0xa9: self._lda_i,
@@ -623,11 +627,11 @@ class SY6502():
         
     def _cld(self, ccb):
         regp = self.reg_P.state
-        regp[3] = False
+        regp[5] = False
         self.reg_P.signal(regp)
     def _cli(self, ccb):
         regp = self.reg_P.state
-        regp[4] = False
+        regp[6] = False
         self.reg_P.signal(regp)
     def _clv(self, ccb):
         regp = self.reg_P.state
@@ -981,6 +985,12 @@ class SY6502():
         ccb()
         self.rw.signal(True)
 
+    def _dex(self, ccb):
+        raise NotImplemented
+
+    def _dey(self, ccb):
+        raise NotImplemented
+
     def _eor(self, val, reg_val): 
         val = int(''.join(['1' if x else '0' for x in val]), 2)
         reg_val = int(''.join(['1' if x else '0' for x in reg_val]), 2)
@@ -1147,6 +1157,12 @@ class SY6502():
         self.rw.signal(False)
         ccb()
         self.rw.signal(True)
+
+    def _inx(self, ccb):
+        raise NotImplemented
+
+    def _iny(self, ccb): 
+        raise NotImplemented
 
     def _jmp_a(self, ccb):
         self.__increment_addr_reg()
@@ -2165,7 +2181,7 @@ class SY6502():
 
     def _brpnt(self, ccb):
         #breakpoint instruction
-        self.__breaking = not self.__breaking
+        self._breaking = not self._breaking
         
     def __increment_addr_reg(self, offset: int = 1):
         pc = self.reg_PCH.state.copy()
@@ -2251,5 +2267,3 @@ class SY6502():
         
         self.__increment_addr_reg()
 
-        if self.__breaking:
-            input()

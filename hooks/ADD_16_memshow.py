@@ -14,9 +14,8 @@ def call(comp_dict):
         int("0x2003", 16)
         ))
 
-    ma = bin(addr[1])[2:] + bin(addr[0])[2:]
-    ta = bin(addr[3])[2:] + bin(addr[2])[2:]
-
+    ma = bin(addr[1])[2:].zfill(8) + bin(addr[0])[2:].zfill(8)
+    ta = bin(addr[3])[2:].zfill(8) + bin(addr[2])[2:].zfill(8)
 
     print('\n'.join((
         "ADD_16 UAD:",
