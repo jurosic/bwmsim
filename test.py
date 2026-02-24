@@ -7,6 +7,18 @@ from chips.SY6502 import SY6502
 from chips.CY62256N import CY62256N
 
 from sys import argv
+import os
+import importlib
+
+HOOKS = []
+
+#load hooks 
+for hk in os.listdir("./hooks/"):
+    if hk.startswith("__"):
+        continue
+    HOOKS.append(importlib.import_module(f"hooks.{hk.strip('.py')}", "call"))
+print(HOOKS)
+
 
 rom = AT28C256()
 ram = CY62256N()
@@ -19,6 +31,12 @@ def cb():
     rw_neg.update()
     rom.update()
     ram.update()
+
+def chs(comp_dict):
+    global HOOKS
+
+    for hk in HOOKS:
+        hk.call(comp_dict)
 
 if __name__ == "__main__":
 
@@ -47,10 +65,12 @@ if __name__ == "__main__":
     ram.n_oe.connect(rw_neg._out)
     rom.n_oe.connect(rw_neg._out)
 
+    comp_dict = {
+            "cpu" : cpu,
+            "rom" : rom,
+            "ram" : ram
+            }
+
     while cpu.run:
         cpu.update(cb)
-        print("Stack:")
-        ram.show("0x01F0", "0x0200")
-        print("ZP:")
-        ram.show("0x0010", "0x001F")
-        input()
+        chs(comp_dict)
