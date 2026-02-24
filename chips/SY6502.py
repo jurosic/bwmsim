@@ -46,6 +46,9 @@ class SY6502():
         self.n_res = EPin()
         self.rw    = EPin()
         
+        #Internal sinumation things
+        self.__breaking = False
+
         self.instruction_set = {
             0x69: self._adc_i,
             0x6d: self._adc_a,
@@ -127,8 +130,13 @@ class SY6502():
             0x84: self._sty_zp,
             0xaa: self._tax,
             0xa8: self._tay,
+            0xba: self._tsx,
             0x8a: self._txa,
+            0x9a: self._txs,
             0x98: self._tya,
+            
+            #very very special breakpoint instruction (ultra rare ;))
+            0x67: self._brpnt,
         }
         
     def get_debug(self):
@@ -2154,7 +2162,10 @@ class SY6502():
 
     def _tya(self, ccb):
         self.reg_ACC.signal(self.reg_Y.state.copy())
-        
+
+    def _brpnt(self, ccb):
+        #breakpoint instruction
+        self.__breaking = not self.__breaking
         
     def __increment_addr_reg(self, offset: int = 1):
         pc = self.reg_PCH.state.copy()
@@ -2239,3 +2250,6 @@ class SY6502():
               )))
         
         self.__increment_addr_reg()
+
+        if self.__breaking:
+            input()

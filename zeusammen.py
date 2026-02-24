@@ -76,8 +76,11 @@ INST_TABLE = {
         "STY": { "abs": 0x8c, "zp": 0x84 },
         "TAX": { "imp": 0xaa },
         "TAY": { "imp": 0xa8 },
+        "TSX": { "imp": 0xBA },
         "TXA": { "imp": 0x8a },
+        "TXS": { "imp": 0x9A },
         "TYA": { "imp": 0x98 },
+        "!"  : { "imp": 0x67 }
     }
 
 
