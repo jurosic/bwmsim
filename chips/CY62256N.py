@@ -24,6 +24,12 @@ class CY62256N:
     def show(self, f, t):
         for i in range(int(f, 16), int(t, 16)):
             print(f"{i} - {self._memory[i]}")
+
+    def get_addresses(self, addresses: tuple[int]):
+        ret : list[int] = []
+        for i in addresses:
+            ret.append(self._memory[i])
+        return ret
         
     def update(self):
         if self.n_ce.state:
