@@ -31,6 +31,8 @@ INST_TABLE = {
         "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65 },
         "AND": { "imm": 0x29, "abs": 0x2d, "zp": 0x25 },
         "ASL": { "abs": 0x0e, "zp": 0x06 },
+        "BCC": { "rel": 0x90 },
+        "BCS": { "rel": 0xB0 },
         "BEQ": { "rel": 0xef },
         "BIT": { "abs": 0x2c, "zp": 0x24 },
         "BMI": { "rel": 0x30 },
@@ -100,7 +102,7 @@ def _inst_to_byte(inst: list[str], pos=0):
         return [INST_TABLE[inst_name]["imp"]]
     elif len(inst) == 2:
         #not a very robust way to check for rel addresses.
-        if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC"]:
+        if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative
             offset = int(inst[1][1:], 16) - pos - ORIGIN  # +2 because the instruction is 2 bytes long
             print(f"Calculating relative offset for {inst[1]}: {int(inst[1][1:], 16)} - {pos} - {ORIGIN} = {offset}")
@@ -186,7 +188,7 @@ def symbolize(prog: list[list[str]]):
         if inst[0].endswith(":"):
             #symbol definiton here
             SYMTABLE[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
-        elif inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+        elif inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative branch, 2 bytes
             byte_ctr += 2
         elif inst[0].upper() in ["JMP", "JSR"]:

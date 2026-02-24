@@ -55,6 +55,8 @@ class SY6502():
             0x25: self._and_zp,
             0x0e: self._asl_a,
             0x06: self._asl_zp,
+            0x90: self._bcc,
+            0xb0: self._bcs,
             0xef: self._beq,
             0x2c: self._bit_a,
             0x24: self._bit_zp,
@@ -407,6 +409,39 @@ class SY6502():
         self.rw.signal(False)
         ccb()
         self.rw.signal(True)
+
+
+    def _bcc(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        
+        ccb()
+        
+        addr_offset = self.data_bus.state.copy()
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
+        
+        regp = self.reg_P.state
+        
+        if regp[7] == False:
+            self.__increment_addr_reg(addr_offset)        
+
+    def _bcs(self, ccb):
+        self.__increment_addr_reg()
+        self.__push_addr_bus()
+        
+        ccb()
+        
+        addr_offset = self.data_bus.state.copy()
+        addr_offset = int(''.join(['1' if x else '0' for x in addr_offset]), 2)
+        if addr_offset > 127:
+            addr_offset -= 256
+        
+        regp = self.reg_P.state
+        
+        if regp[7] == True:
+            self.__increment_addr_reg(addr_offset)        
 
     def _beq(self, ccb):
         self.__increment_addr_reg()
