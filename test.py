@@ -74,3 +74,5 @@ if __name__ == "__main__":
     while cpu.run:
         cpu.update(cb)
         chs(comp_dict)
+        if cpu._breaking:
+            input()

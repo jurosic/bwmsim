@@ -48,7 +48,9 @@ FIB:
 	STA 01
 	LDA $2003
 	STA 00
-	
+
+	JSR SEND_16
+
 	;fib1 <- fib2
 	LDA 05
 	STA 03
@@ -57,7 +59,7 @@ FIB:
 	
 	INC 06
 	LDA 06
-	CMP #15
+	CMP #16
 
 	BNE FIB
 
@@ -87,3 +89,24 @@ ADD_16:
 	CLC ; cleanup
 
 	RTS
+
+SEND_16:
+	;sends 16 bits to reserved mem
+	;to be read externaly
+	; $2010 - Low
+	; $2011 - High
+	; $2012 - Flags (
+	;		all zeroes - external source read, waiting
+	;       LSB   1 - INT
+	;		LSB < 1 - CHAR (only uses LOW)
+	;	)
+	LDA 00
+	STA $2011
+	LDA 01
+	STA $2010
+
+	LDA #81
+	STA $2012
+
+	RTS
+

@@ -30,6 +30,9 @@ class CY62256N:
         for i in addresses:
             ret.append(self._memory[i])
         return ret
+
+    def set_address(self, address, val):
+        self._memory[address] = val
         
     def update(self):
         if self.n_ce.state:
