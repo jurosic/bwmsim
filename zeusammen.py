@@ -23,7 +23,11 @@ example code:
 
 import sys
 
+#BEHAVIOR FLAGS
+TEST_OUTPUT = False
+
 ORIGIN = 0x0000
+LIBS = []
 
 SYMTABLE = {}
 
@@ -91,6 +95,9 @@ INST_TABLE = {
 class StartUndefined(Exception):
     pass
 
+class LibDirUndefined(Exception):
+    pass
+
 def _inst_to_byte(inst: list[str], pos=0): 
     """
         Converts an instruction into a list of bytes
@@ -151,7 +158,11 @@ def _help():
     print('\n'.join((
         "ZEUSAMMEN is a compiler from assembly into the SY6502 instruction set",
         "Example usage:",
-        "\t python zeusammen.py cmp [infile] [outfile]"
+        "\t python zeusammen.py cmp [infile] [outfile] [libdir]",
+
+        "",
+        "Or if youd like to see how the file looks after processing",
+        "Add the -to flag"
     )))
     
 def sanitize(line: str) -> list[str]:
@@ -166,6 +177,8 @@ def sanitize(line: str) -> list[str]:
     cmt_start: int = len(line)
     if ";" in line:
         cmt_start = line.index(";")
+    if ".extern" in line:
+        return [""]
     
     #truncate without comment
     #split into bytes
@@ -296,8 +309,30 @@ def write_bytes(prog: list[list[int]], outfile: str):
             else:
                 f.write((0).to_bytes(1, "little"))
                 byte_cnter += 1
+
+def import_libs(prog, lib_dir= None):
+    for lib in LIBS:
+        if lib_dir == None:
+            raise LibDirUndefined
+        with open(lib_dir.strip("/") + '/' +lib, "r") as lf:
+            for line in lf:
+                san = sanitize(line)
+                if san != [""]:
+                    prog.append(san)
+
+def recurse_libs(asmfile: str, lib_dir: str):
+    with open(asmfile, "r") as f:
+        for line in f:
+            if line.startswith(".extern"):
+                libn = line.split(" ")[1].strip() + ".asm"
+                #cut libdir if in name
+                libn = libn.split("/")[-1]
+                libnn = lib_dir.strip("/") + "/" + libn
+                recurse_libs(libnn, lib_dir)
+                if libn not in LIBS:
+                    LIBS.append(libn)
     
-def rn_cmp(infile: str, outfile: str):
+def rn_cmp(infile: str, outfile: str, lib_dir: str):
     global SYMTABLE
     global ORIGIN   
     """
@@ -324,7 +359,17 @@ def rn_cmp(infile: str, outfile: str):
             san = sanitize(line)
             if san != [""]:
                 sanitized.append(san)
-    
+
+    recurse_libs(infile, lib_dir)
+    import_libs(sanitized, lib_dir)
+   
+    if TEST_OUTPUT:
+        with open(infile.split("/")[-1] + ".to", "w+") as f:
+            for eline in sanitized:
+                f.write(' '.join(eline) + '\n')
+        print("dumped debug output")
+        return
+
     symbolize(sanitized)
 
     print("Symbol Table:")
@@ -346,10 +391,15 @@ if __name__ == "__main__":
     
     _argsan(args)
 
+    #check for flags
+    for arg in args:
+        if arg == '-to':
+            TEST_OUTPUT = True
+
     #essentially running match twice but whatever
     match args[1]:
         case "cmp":
-            rn_cmp(args[2], args[3])
+            rn_cmp(args[2], args[3], args[4])
         
         case _:
             _help()
