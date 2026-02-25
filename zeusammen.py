@@ -122,7 +122,7 @@ def _inst_to_byte(inst: list[str], pos=0):
         if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative
             offset = int(inst[1][1:], 16) - pos - ORIGIN  # +2 because the instruction is 2 bytes long
-            print(f"Calculating relative offset for {inst[1]}: {int(inst[1][1:], 16)} - {pos} - {ORIGIN} = {offset}")
+            #print(f"Calculating relative offset for {inst[1]}: {int(inst[1][1:], 16)} - {pos} - {ORIGIN} = {offset}")
             return [INST_TABLE[inst_name]["rel"], offset]
         elif inst[1].startswith("#"):
             #immediate
@@ -261,7 +261,7 @@ def preprocess(prog: list[list[str]]):
     for inst in prog:
         for i in range(len(inst)):
             if inst[i] in SYMTABLE.keys():
-                print(f"Replacing symbol {inst[i]} with {SYMTABLE[inst[i]]}")
+                #print(f"Replacing symbol {inst[i]} with {SYMTABLE[inst[i]]}")
                 inst[i] = SYMTABLE[inst[i]]
    
     #convert instructions to bytes
@@ -298,7 +298,7 @@ def write_bytes(prog: list[list[int]], outfile: str):
             if i < len(prog):
                 for byte in prog[i]:
                     num_bytes = (byte.bit_length() + 7) // 8 or 1
-                    print(f"{num_bytes} bytes for {byte}")
+                    #print(f"{num_bytes} bytes for {byte}")
                     signed = byte < 0
                     f.write(byte.to_bytes(num_bytes, "little", signed=signed))
                     byte_cnter += num_bytes  
@@ -377,18 +377,26 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
 
     symbolize(sanitized)
 
-    print("Symbol Table:")
-    for k in SYMTABLE.keys():
-        print(f"\t{k} : {SYMTABLE[k]}")
-    print(sanitized)
+    #print("Symbol Table:")
+    #for k in SYMTABLE.keys():
+    #    print(f"\t{k} : {SYMTABLE[k]}")
+    #print(sanitized)
 
     preprocess(sanitized)
 
-    print(sanitized)
-    print(SYMTABLE)
+    #print(sanitized)
+    #print(SYMTABLE)
 
     write_bytes(sanitized, outfile)
 
+    byte_len = 0
+    for inst in sanitized:
+        byte_len += len(inst)
+    print('\n'.join((
+            f"Wrote: {len(sanitized)} instructions, totalling {byte_len} bytes.",
+            f"thats {(byte_len/(2**16))*100:.2f}% of 16bit addressing",
+            f"or    {(byte_len/(2**15))*100:.2f}% of 15bit addressing",
+        )))
 
 
 if __name__ == "__main__":
