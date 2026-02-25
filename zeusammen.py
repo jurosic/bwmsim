@@ -98,6 +98,9 @@ class StartUndefined(Exception):
 class LibDirUndefined(Exception):
     pass
 
+class SymbolRedefinitionError(Exception):
+    pass
+
 def _inst_to_byte(inst: list[str], pos=0): 
     """
         Converts an instruction into a list of bytes
@@ -207,6 +210,8 @@ def symbolize(prog: list[list[str]]):
     for inst in prog:
         if inst[0].endswith(":"):
             #symbol definiton here
+            if inst[0].strip(':') in SYMTABLE:
+                raise SymbolRedefinitionError(f"Symbol {inst[0].strip(':')} is being redefined!")
             SYMTABLE[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
         elif inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative branch, 2 bytes
