@@ -5,4 +5,5 @@
 START:
 	LDA #FF
 
-	
+FLIB1:
+	LDA #00

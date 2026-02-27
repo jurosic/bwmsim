@@ -1,3 +1,8 @@
+.equ __adder_m_low,  $0x2000
+.equ __adder_m_high, $0x2001
+.equ __adder_t_low,  $0x2002
+.equ __adder_t_high, $0x2003
+
 ADD_16:
 	; $2000 - M lower
 	; $2001 - M Higher
@@ -8,14 +13,14 @@ ADD_16:
 	CLV
 
 	;add lower halves together
-	LDA $2002
-	ADC $2000
-	STA $2002
+	LDA __adder_t_low
+	ADC __adder_m_low
+	STA __adder_t_low
 
 	;add higher halves together
-	LDA $2003
-	ADC $2001
-	STA $2003
+	LDA __adder_t_high
+	ADC __adder_m_high
+	STA __adder_t_high
 
 	CLC ; cleanup
 

@@ -30,6 +30,7 @@ ORIGIN = 0x0000
 LIBS = []
 
 SYMTABLE = {}
+CONSTANTS = {}
 
 INST_TABLE = {
         "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65 },
@@ -118,6 +119,15 @@ def _inst_to_byte(inst: list[str], pos=0):
         #implied
         return [INST_TABLE[inst_name]["imp"]]
     elif len(inst) == 2:
+        #wild, check for .byte definition
+        if inst[0].lower() == ".byte":
+            base = 10
+            if inst[1].startswith("0b"):
+                base = 2
+            elif inst[1].startswith("0x"):
+                base = 16
+            return [int(inst[1], base)]
+
         #not a very robust way to check for rel addresses.
         if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative
@@ -126,11 +136,26 @@ def _inst_to_byte(inst: list[str], pos=0):
             return [INST_TABLE[inst_name]["rel"], offset]
         elif inst[1].startswith("#"):
             #immediate
-            return [INST_TABLE[inst_name]["imm"], int(inst[1][1:], 16)]
+            base = 10
+            if inst[1][1:].startswith("0b"):
+                base = 2
+            elif inst[1][1:].startswith("0x"):
+                base = 16
+            return [INST_TABLE[inst_name]["imm"], int(inst[1][1:], base)]
         elif inst[1].startswith("$"):
             #absolute
+            base = 10
+            if inst[1][1:].startswith("0b"):
+                base = 2
+            elif inst[1][1:].startswith("0x"):
+                base = 16
             return [INST_TABLE[inst_name]["abs"], int(inst[1][1:], 16) & 0xFF, (int(inst[1][1:], 16) >> 8) & 0xFF]
         else:
+            base = 10
+            if inst[1].startswith("0b"):
+                base = 2
+            elif inst[1].startswith("0x"):
+                base = 16
             #zero page
             return [INST_TABLE[inst_name]["zp"], int(inst[1], 16)]
     else:
@@ -169,6 +194,8 @@ def _help():
     )))
     
 def sanitize(line: str) -> list[str]:
+    global ORIGIN
+
     """
         Checks for invalid input and removes comments
         Breaks up lines into individual bytes
@@ -180,14 +207,23 @@ def sanitize(line: str) -> list[str]:
     cmt_start: int = len(line)
     if ";" in line:
         cmt_start = line.index(";")
-    if ".extern" in line:
+    if line.startswith(";") or line.strip() == "":
+        return [""]
+
+    if line.startswith(".org"):
+        ORIGIN = int(line.split(" ")[1][1:], 16)
+        return [""]
+    if line.startswith(".extern"):
         return [""]
     
     #truncate without comment
     #split into bytes
     cde = line[:cmt_start]
     cde = cde.strip()
-    cde = cde.split(" ")
+    if cde.startswith(".equ"):
+        cde = [cde[:4], cde[4:].strip()]
+    else:
+        cde = cde.split(" ")
     
     return cde
 
@@ -204,10 +240,26 @@ def symbolize(prog: list[list[str]]):
     
     global SYMTABLE
     
-    byte_ctr: int = 0
-    
     #pass 1
+    #handle .equ definitions first, so we can use them in labels
     for inst in prog:
+        #equ syntax: .equ [name], [val]
+        if inst[0].startswith(".equ"):
+            parts = inst[1].split(",")
+            if len(parts) != 2:
+                print(f"Invalid .equ directive: {inst}")
+                exit(1)
+            sym_name = parts[0].strip()
+            sym_value = parts[1].strip()
+            print(f"Defining const {sym_name} as {sym_value}")
+            if sym_name in CONSTANTS.keys():
+                raise SymbolRedefinitionError(f"Constant {sym_name} is being redefined!")
+            CONSTANTS[sym_name] = sym_value
+
+    byte_ctr: int = 0
+    for inst in prog:
+        if inst[0].startswith(".equ"):
+            continue #already handled .equ definitions
         if inst[0].endswith(":"):
             #symbol definiton here
             if inst[0].strip(':') in SYMTABLE:
@@ -224,7 +276,13 @@ def symbolize(prog: list[list[str]]):
             byte_ctr += 1
             #check length of the arg (1 byte or 2 bytes)
             if len(inst) > 1:
-                if inst[1].startswith("$"):
+                if inst[1] in CONSTANTS.keys():
+                    print(f"Constant {inst[1]} is being used in instruction {inst}, replacing with {CONSTANTS[inst[1]]}")
+                    if CONSTANTS[inst[1]].startswith("$"):
+                        byte_ctr += 2
+                    else:
+                        byte_ctr += 1
+                elif inst[1].startswith("$"):
                     #absolute, 2 bytes
                     byte_ctr += 2
                 else:
@@ -237,6 +295,8 @@ def symbolize(prog: list[list[str]]):
         plen -= 1
         i = len(prog) - plen - 1
         if len(prog[i]) == 1 and prog[i][0].endswith(":"):
+            prog.pop(i)
+        if prog[i][0].startswith(".equ"):
             prog.pop(i)
 
     #remove any empty lines
@@ -261,8 +321,16 @@ def preprocess(prog: list[list[str]]):
     for inst in prog:
         for i in range(len(inst)):
             if inst[i] in SYMTABLE.keys():
-                #print(f"Replacing symbol {inst[i]} with {SYMTABLE[inst[i]]}")
                 inst[i] = SYMTABLE[inst[i]]
+            if inst[i] in CONSTANTS.keys():
+                inst[i] = CONSTANTS[inst[i]]
+
+    if TEST_OUTPUT:
+        with open("test.to", "w+") as f:
+            for eline in prog:
+                f.write(' '.join(eline) + '\n')
+        print(f"Dumped debug output to test.to")
+        exit(0)
    
     #convert instructions to bytes
     byte_cnter = 0
@@ -351,11 +419,7 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
     sanitized: list = []
     with open(infile, "r") as f:
         for line in f:
-            if line.startswith("."):
-                if line.startswith(".org"):
-                    ORIGIN = int(line.split(" ")[1][1:], 16)
-                continue
-
+            line = line.strip()
             if any((line.strip() == "",
                    line.startswith(";"),
                    line.startswith("\n"))):
@@ -367,19 +431,14 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
 
     recurse_libs(infile, lib_dir)
     import_libs(sanitized, lib_dir)
-   
-    if TEST_OUTPUT:
-        with open(infile.split("/")[-1] + ".to", "w+") as f:
-            for eline in sanitized:
-                f.write(' '.join(eline) + '\n')
-        print("dumped debug output")
-        return
 
+
+   
     symbolize(sanitized)
 
-    #print("Symbol Table:")
-    #for k in SYMTABLE.keys():
-    #    print(f"\t{k} : {SYMTABLE[k]}")
+    print("Symbol Table:")
+    for k in SYMTABLE.keys():
+        print(f"\t{k} : {SYMTABLE[k]}")
     #print(sanitized)
 
     preprocess(sanitized)
