@@ -8,6 +8,10 @@
 ; 06    - cnter
 
 ; i should really add .data support :(
+
+
+;test out warning for same value constants
+.equ this_should_warn, $0x2003
 START:
 	;testing add_16
 	CLC

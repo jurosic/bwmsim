@@ -22,6 +22,7 @@ example code:
 """
 
 import sys
+import warnings
 
 #BEHAVIOR FLAGS
 TEST_OUTPUT = False
@@ -251,9 +252,12 @@ def symbolize(prog: list[list[str]]):
                 exit(1)
             sym_name = parts[0].strip()
             sym_value = parts[1].strip()
-            print(f"Defining const {sym_name} as {sym_value}")
             if sym_name in CONSTANTS.keys():
                 raise SymbolRedefinitionError(f"Constant {sym_name} is being redefined!")
+            #check if sym_value is already somewhere
+            for k in CONSTANTS.keys():
+                if CONSTANTS[k] == sym_value:
+                    warnings.warn(f"Constant {sym_name} is being defined as {sym_value}, which is already defined as {k} in the constants table. This may cause issues if {sym_name} is a reserved address.")
             CONSTANTS[sym_name] = sym_value
 
     byte_ctr: int = 0
@@ -277,7 +281,6 @@ def symbolize(prog: list[list[str]]):
             #check length of the arg (1 byte or 2 bytes)
             if len(inst) > 1:
                 if inst[1] in CONSTANTS.keys():
-                    print(f"Constant {inst[1]} is being used in instruction {inst}, replacing with {CONSTANTS[inst[1]]}")
                     if CONSTANTS[inst[1]].startswith("$"):
                         byte_ctr += 2
                     else:
@@ -436,9 +439,9 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
    
     symbolize(sanitized)
 
-    print("Symbol Table:")
-    for k in SYMTABLE.keys():
-        print(f"\t{k} : {SYMTABLE[k]}")
+    #print("Symbol Table:")
+    #for k in SYMTABLE.keys():
+    #    print(f"\t{k} : {SYMTABLE[k]}")
     #print(sanitized)
 
     preprocess(sanitized)
