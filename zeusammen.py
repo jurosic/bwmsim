@@ -26,11 +26,16 @@ import warnings
 
 #BEHAVIOR FLAGS
 TEST_OUTPUT = False
+STRICTNESS = 1
+OUTPUT_FILE = "a.bin"
+WARN_AS_ERRORS = False
+LIB_DIR = None
 
 ORIGIN = 0x0000
+
 LIBS = []
 
-SYMTABLE = {}
+LABELS = {}
 CONSTANTS = {}
 
 INST_TABLE = {
@@ -101,6 +106,12 @@ class LibDirUndefined(Exception):
     pass
 
 class SymbolRedefinitionError(Exception):
+    pass
+
+class DoubleConstDefWarning(Warning):
+    pass
+
+class DangerousArgWarning(Warning):
     pass
 
 def _inst_to_byte(inst: list[str], pos=0): 
@@ -187,11 +198,17 @@ def _help():
     print('\n'.join((
         "ZEUSAMMEN is a compiler from assembly into the SY6502 instruction set",
         "Example usage:",
-        "\t python zeusammen.py cmp [infile] [outfile] [libdir]",
+        "\t python zeusammen.py cmp [infile] -o [outfile]",
 
         "",
-        "Or if youd like to see how the file looks after processing",
-        "Add the -to flag"
+        "-o [outfile]: specify output file (default: a.bin)",
+        "-S [strictness]: set strictness level (default: 1)",
+        "\tStrictness levels:",
+        "\t\t0: Basic syntax checking (default)",
+        "\t\t1: More strict", 
+        "\t\t2: Very strict",
+        "-to: Output the sanitized and symbolized program to test.to and exit (for testing",
+        "-ld: Specify a library directory to search for .extern files (required if using .extern directives",
     )))
     
 def sanitize(line: str) -> list[str]:
@@ -239,7 +256,7 @@ def symbolize(prog: list[list[str]]):
         StartUndefined: Raised if the program lacks a START label
     """
     
-    global SYMTABLE
+    global LABELS
     
     #pass 1
     #handle .equ definitions first, so we can use them in labels
@@ -256,19 +273,35 @@ def symbolize(prog: list[list[str]]):
                 raise SymbolRedefinitionError(f"Constant {sym_name} is being redefined!")
             #check if sym_value is already somewhere
             for k in CONSTANTS.keys():
-                if CONSTANTS[k] == sym_value:
-                    warnings.warn(f"Constant {sym_name} is being defined as {sym_value}, which is already defined as {k} in the constants table. This may cause issues if {sym_name} is a reserved address.")
+               if CONSTANTS[k] == sym_value and STRICTNESS > 0:
+                     if WARN_AS_ERRORS:
+                          raise DoubleConstDefWarning(f"Constant {sym_value} is already defined as {k}!")
+                     else:
+                          warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {sym_name} is a reserved address.", DangerousArgWarning)
             CONSTANTS[sym_name] = sym_value
 
     byte_ctr: int = 0
-    for inst in prog:
+    for i, inst in enumerate(prog):
+        
         if inst[0].startswith(".equ"):
             continue #already handled .equ definitions
+        
+        if STRICTNESS > 1:
+            #exit if an argument is NOT a label, constant, or immediate value
+            for arg in inst[1:]:
+                if arg.startswith("$"):
+                    if WARN_AS_ERRORS:
+                        raise DangerousArgWarning(f"Argument {arg} in instruction {i}:{inst[0]} is not a label, constant, or immediate value. This increases the risk of unexpected behavior.")
+                    else:
+                        warnings.warn(f"Argument {arg} in instruction {i}:{inst[0]} is not a label, constant, or immediate value. This increases the risk of unexpected behavior.", DangerousArgWarning)
+
+
+
         if inst[0].endswith(":"):
             #symbol definiton here
-            if inst[0].strip(':') in SYMTABLE:
+            if inst[0].strip(':') in LABELS.keys():
                 raise SymbolRedefinitionError(f"Symbol {inst[0].strip(':')} is being redefined!")
-            SYMTABLE[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
+            LABELS[inst[0].strip(":")] = "$" + str(hex(byte_ctr + ORIGIN))[2:].upper()
         elif inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
             #relative branch, 2 bytes
             byte_ctr += 2
@@ -308,11 +341,11 @@ def symbolize(prog: list[list[str]]):
             prog.pop(i)
 
     #check for start, more efficient this way than uppering or lowering
-    if "start" not in SYMTABLE.keys() and "START" not in SYMTABLE.keys():
+    if "start" not in LABELS.keys() and "START" not in LABELS.keys():
         raise StartUndefined("The program has no start!")
 
 def preprocess(prog: list[list[str]]):
-    global SYMTABLE
+    global LABELS
     """
         Replaces things like variable names or labels with memory locations
 
@@ -323,8 +356,8 @@ def preprocess(prog: list[list[str]]):
     #now we replace
     for inst in prog:
         for i in range(len(inst)):
-            if inst[i] in SYMTABLE.keys():
-                inst[i] = SYMTABLE[inst[i]]
+            if inst[i] in LABELS.keys():
+                inst[i] = LABELS[inst[i]]
             if inst[i] in CONSTANTS.keys():
                 inst[i] = CONSTANTS[inst[i]]
 
@@ -409,7 +442,7 @@ def recurse_libs(asmfile: str, lib_dir: str):
                     LIBS.append(libn)
     
 def rn_cmp(infile: str, outfile: str, lib_dir: str):
-    global SYMTABLE
+    global LABELS
     global ORIGIN   
     """
         Essentially a function that gathers all the steps in the compilation process
@@ -467,15 +500,27 @@ if __name__ == "__main__":
     _argsan(args)
 
     #check for flags
-    for arg in args:
-        if arg == '-to':
-            TEST_OUTPUT = True
+    for i in range(2, len(args)):
+        match args[i]:
+            case "-to":
+                TEST_OUTPUT = True
+            case "-o": 
+                if i + 1 >= len(args):
+                    print("Please supply an output file after -o")
+                    exit(1)
+                OUTPUT_FILE = args[i + 1]
+            case "-S":
+                if i + 1 >= len(args):
+                    print("Please supply a value after -S")
+                    exit(1)
+                STRICTNESS = int(args[i + 1])
+            case "-ld":
+                if i + 1 >= len(args):
+                    print("Please supply a library directory after -ld")
+                    exit(1)
+                LIB_DIR = args[i + 1]
+            case "-werr":
+                WARN_AS_ERRORS = True
 
-    #essentially running match twice but whatever
-    match args[1]:
-        case "cmp":
-            rn_cmp(args[2], args[3], args[4])
-        
-        case _:
-            _help()
-            exit(1)
+
+    rn_cmp(args[1], OUTPUT_FILE, LIB_DIR)
