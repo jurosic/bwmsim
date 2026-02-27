@@ -1,26 +1,3 @@
-"""
-example code:
-    
-    ; ==========================================
-    ; TEST: Count to 5
-    ; Tests: Labels, Immediate Mode, Absolute Jumps
-    ; ==========================================
-
-    START:
-        LDA #$00      ; Initialize Accumulator to 0
-        CLC           ; Clear Carry before math
-
-    LOOP:
-        ADC #$01      ; Add 1 to Accumulator
-        CMP #$05      ; Compare Accumulator to 5
-        BEQ FINISH    ; If Equal (Z=1), go to FINISH
-        JMP LOOP      ; Else, Jump back to LOOP
-
-    FINISH:
-        STA $FF       ; Store the result (5) in address 255
-        BRK           ; Stop execution
-"""
-
 import sys
 import warnings
 
@@ -204,11 +181,14 @@ def _help():
         "-o [outfile]: specify output file (default: a.bin)",
         "-S [strictness]: set strictness level (default: 1)",
         "\tStrictness levels:",
-        "\t\t0: Basic syntax checking (default)",
-        "\t\t1: More strict", 
-        "\t\t2: Very strict",
+        "\t\t0: Very lenient, will allow potentially dangerous constructs with no warnings",
+        "\t\t1: More strict, will warn about bad/unwanted practices", 
+        "\t\t2: Very strict, will warn about any argument that is not a label, constant, or immediate vaThis is recommended if making/using libraries.",
+        "-werr: Treat warnings as errors (implies -S 2)",
         "-to: Output the sanitized and symbolized program to test.to and exit (for testing",
         "-ld: Specify a library directory to search for .extern files (required if using .extern directives",
+        "",
+        "Libraries are added to the TOP of the program, this makes parsing some things easier."
     )))
     
 def sanitize(line: str) -> list[str]:
@@ -260,7 +240,7 @@ def symbolize(prog: list[list[str]]):
     
     #pass 1
     #handle .equ definitions first, so we can use them in labels
-    for inst in prog:
+    for i, inst in enumerate(prog):
         #equ syntax: .equ [name], [val]
         if inst[0].startswith(".equ"):
             parts = inst[1].split(",")
@@ -273,11 +253,14 @@ def symbolize(prog: list[list[str]]):
                 raise SymbolRedefinitionError(f"Constant {sym_name} is being redefined!")
             #check if sym_value is already somewhere
             for k in CONSTANTS.keys():
-               if CONSTANTS[k] == sym_value and STRICTNESS > 0:
+                ign = False
+                if i-1 > 0:
+                    ign = prog[i-1][0].strip() == ".ignore"
+                if CONSTANTS[k] == sym_value and STRICTNESS > 0 and not ign:
                      if WARN_AS_ERRORS:
                           raise DoubleConstDefWarning(f"Constant {sym_value} is already defined as {k}!")
                      else:
-                          warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {sym_name} is a reserved address.", DangerousArgWarning)
+                          warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DangerousArgWarning)
             CONSTANTS[sym_name] = sym_value
 
     byte_ctr: int = 0
@@ -285,8 +268,14 @@ def symbolize(prog: list[list[str]]):
         
         if inst[0].startswith(".equ"):
             continue #already handled .equ definitions
+        if inst[0].startswith(".ignore"):
+            continue
         
-        if STRICTNESS > 1:
+        ign = False
+        if i-1 > 0:
+            ign = prog[i-1][0].strip() == ".ignore" 
+        #check if previous is .ignore
+        if STRICTNESS > 1 and not ign:
             #exit if an argument is NOT a label, constant, or immediate value
             for arg in inst[1:]:
                 if arg.startswith("$"):
@@ -332,7 +321,7 @@ def symbolize(prog: list[list[str]]):
         i = len(prog) - plen - 1
         if len(prog[i]) == 1 and prog[i][0].endswith(":"):
             prog.pop(i)
-        if prog[i][0].startswith(".equ"):
+        if prog[i][0].startswith(".equ") or prog[i][0].startswith(".ignore"):
             prog.pop(i)
 
     #remove any empty lines
@@ -412,7 +401,7 @@ def write_bytes(prog: list[list[int]], outfile: str):
                 #write the reset vector
                 f.write((0x4C).to_bytes(1, "little"))
                 num_bytes = (ORIGIN.bit_length() + 7) // 8 or 1
-                f.write(ORIGIN.to_bytes(num_bytes, "little"))
+                f.write(int(LABELS['START'][1:], 16).to_bytes(num_bytes, "little"))
                 byte_cnter += num_bytes + 1
                 wrote_reset_vector = True
             else:
@@ -452,7 +441,7 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
         outfile (str): output file
     """
     
-    sanitized: list = []
+    main: list = []
     with open(infile, "r") as f:
         for line in f:
             line = line.strip()
@@ -463,13 +452,15 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
 
             san = sanitize(line)
             if san != [""]:
-                sanitized.append(san)
+                main.append(san)
+
+    sanitized = []
 
     recurse_libs(infile, lib_dir)
     import_libs(sanitized, lib_dir)
+ 
+    sanitized.extend(main)
 
-
-   
     symbolize(sanitized)
 
     #print("Symbol Table:")
