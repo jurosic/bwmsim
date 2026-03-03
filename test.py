@@ -16,7 +16,7 @@ HOOKS = []
 for hk in os.listdir("./hooks/"):
     if hk.startswith("__"):
         continue
-    HOOKS.append(importlib.import_module(f"hooks.{hk.strip('.py')}", "call"))
+    HOOKS.append(importlib.import_module(f"hooks.{hk[0:len(hk)-3]}", "call"))
 print(HOOKS)
 
 
@@ -31,6 +31,9 @@ def cb():
     rw_neg.update()
     rom.update()
     ram.update()
+    rom.print_dbg()
+    ram.print_dbg()
+    print("--CB END--")
 
 def chs(comp_dict):
     global HOOKS
