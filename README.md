@@ -36,7 +36,7 @@ The assembler/compiler is mostly just vibecoded for now, but features a custom s
           - loads the byte where the zeropage address incremented by X points to
           - *OR*
           - loads the byte at the address that the zeropage address points to incremented by Y
-          - syntax: `(address,X)` or `(address),Y`
+          - syntax: `([address],X)` or `([address]),Y`
 3. **Labels**
    - as it should, the compiler/assembler supports labels
    - labels are defined by a `:` suffix like so: `START:`
