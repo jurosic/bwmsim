@@ -1,0 +1,18 @@
+.extern PRINT_UINT16
+.org $8000
+
+START:
+	; try printing 256
+	LDA #0x01
+	STA $0x2000
+	LDA #0xFF
+	STA $0x2001
+
+	LDA #0x00
+	STA 0xFE
+	LDA #0x20
+	STA 0xFF
+
+	JSR PRINT_UINT16
+
+	BRK
