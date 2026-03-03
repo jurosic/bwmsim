@@ -12,6 +12,9 @@
 
 ;test out warning for same value constants
 .equ this_should_warn, $0x2003
+;this should ignore
+.ignore
+.equ this_should_ignore, $0x2001
 START:
 	;testing add_16
 	CLC
