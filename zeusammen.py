@@ -14,11 +14,12 @@ LIBS = []
 
 LABELS = {}
 CONSTANTS = {}
+VARIABLES = {}
 
 INST_TABLE = {
-        "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65 },
-        "AND": { "imm": 0x29, "abs": 0x2d, "zp": 0x25 },
-        "ASL": { "abs": 0x0e, "zp": 0x06 },
+        "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65, "indx": 0x61, "indy": 0x71, "zpx": 0x75, "absx": 0x7D, "absy": 0x79 },
+        "AND": { "imm": 0x29, "abs": 0x2d, "zp": 0x25, "indx": 0x21, "indy": 0x31, "zpx": 0x35, "absx": 0x3D, "absy": 0x39 },
+        "ASL": { "abs": 0x0e, "zp": 0x06, "imp": 0x0A, "zpx": 0x16, "absx": 0x1E },
         "BCC": { "rel": 0x90 },
         "BCS": { "rel": 0xB0 },
         "BEQ": { "rel": 0xef },
@@ -33,39 +34,39 @@ INST_TABLE = {
         "CLD": { "imp": 0xd8 },
         "CLI": { "imp": 0x58 },
         "CLV": { "imp": 0xB8 },
-        "CMP": { "imm": 0xc9, "abs": 0xcd, "zp": 0xc5 },
+        "CMP": { "imm": 0xc9, "abs": 0xcd, "zp": 0xc5, "indx": 0xC1, "indy": 0xD1, "zpx": 0xD5, "absx": 0xDD, "absy": 0xD9 },
         "CPX": { "imm": 0xe0, "abs": 0xce, "zp": 0xe4 },
         "CPY": { "imm": 0xc0, "abs": 0xcc, "zp": 0xe4 },
-        "DEC": { "abs": 0xce, "zp": 0xc6 },
+        "DEC": { "abs": 0xce, "zp": 0xc6, "zpx": 0xD6, "absx": 0xDE },
         "DEX": { "imp": 0xca },
         "DEY": { "imp": 0x88 },
-        "EOR": { "imm": 0x49, "abs": 0x4d, "zp": 0x45 },
-        "INC": { "abs": 0xee, "zp": 0xe6 },
+        "EOR": { "imm": 0x49, "abs": 0x4d, "zp": 0x45, "indx": 0x41, "indy": 0x51, "zpx": 0x55, "absx": 0x5D, "absy": 0x59 },
+        "INC": { "abs": 0xee, "zp": 0xe6, "zpx": 0xF6, "absx": 0xFE },
         "INX": { "imp": 0xE8 },
         "INY": { "imp": 0xC8 },
-        "JMP": { "abs": 0x4c },
+        "JMP": { "abs": 0x4c, "ind": 0x6C },
         "JSR": { "abs": 0x20 },
-        "LDA": { "imm": 0xa9, "abs": 0xad, "zp": 0xa5 },
-        "LDX": { "imm": 0xa2, "abs": 0xae, "zp": 0xa6 },
-        "LDY": { "imm": 0xa0, "abs": 0xac, "zp": 0xa4 },
-        "LSR": { "abs": 0x4e, "zp": 0x46 },
+        "LDA": { "imm": 0xa9, "abs": 0xad, "zp": 0xa5, "indx": 0xA1, "indy": 0xB1, "zpx": 0xB5, "absx": 0xBD, "absy": 0xB9 },
+        "LDX": { "imm": 0xa2, "abs": 0xae, "zp": 0xa6, "absy": 0xBE, "zpy": 0xB6 },
+        "LDY": { "imm": 0xa0, "abs": 0xac, "zp": 0xa4, "zpx": 0xB4, "absx": 0xBC },
+        "LSR": { "abs": 0x4e, "zp": 0x46, "imp": 0x4A, "zpx": 0x56, "absx": 0x5E },
         "NOP": { "imp": 0xea },
-        "ORA": { "imm": 0x09, "abs": 0x0d, "zp": 0x05 },
+        "ORA": { "imm": 0x09, "abs": 0x0d, "zp": 0x05, "indx": 0x01, "indy": 0x11, "zpx": 0x15, "absx": 0x1D, "absy": 0x19 },
         "PHA": { "imp": 0x48 },
         "PHP": { "imp": 0x08 },
         "PLA": { "imp": 0x68 },
         "PLP": { "imp": 0x28 },
-        "ROL": { "abs": 0x2e, "zp": 0x26 },
-        "ROR": { "abs": 0x6e, "zp": 0x66 },
+        "ROL": { "abs": 0x2e, "zp": 0x26, "imp": 0x2A, "zpx": 0x36, "absx": 0x3E },
+        "ROR": { "abs": 0x6e, "zp": 0x66, "imp": 0x6A, "zpx": 0x76, "absx": 0x7E },
         "RTI": { "imp": 0x40 },
         "RTS": { "imp": 0x60 },
-        "SBC": { "imm": 0xe9, "abs": 0xed, "zp": 0xe5 },
+        "SBC": { "imm": 0xe9, "abs": 0xed, "zp": 0xe5, "indx": 0xE1, "indy": 0xF1, "zpx": 0xF5, "absx": 0xFD, "absy": 0xF9 },
         "SEC": { "imp": 0x38 },
         "SED": { "imp": 0xf8 },
         "SEI": { "imp": 0x78 },
-        "STA": { "abs": 0x8d, "zp": 0x85 },
-        "STX": { "abs": 0x8e, "zp": 0x86 },
-        "STY": { "abs": 0x8c, "zp": 0x84 },
+        "STA": { "abs": 0x8d, "zp": 0x85, "indx": 0x81, "indy": 0x91, "zpx": 0x95, "absx": 0x9D, "absy": 0x99 },
+        "STX": { "abs": 0x8e, "zp": 0x86, "zpy": 0x96 },
+        "STY": { "abs": 0x8c, "zp": 0x84, "zpx": 0x94 }, 
         "TAX": { "imp": 0xaa },
         "TAY": { "imp": 0xa8 },
         "TSX": { "imp": 0xBA },
@@ -99,23 +100,33 @@ def _inst_to_byte(inst: list[str], pos=0):
         inst (list[str]): instruction to be converted
     """
     
-    if inst[0].upper() not in INST_TABLE.keys():
+    if inst[0].upper() not in INST_TABLE.keys() and inst[0].lower() not in [".byte"]:
         print(f"Invalid instruction {inst[0]}")
         exit(1)
 
     inst_name = inst[0].upper()
     if len(inst) == 1:
-        #implied
+        #implied (acc is treated as imp too)
         return [INST_TABLE[inst_name]["imp"]]
     elif len(inst) == 2:
         #wild, check for .byte definition
         if inst[0].lower() == ".byte":
+            #another vibecoded check
+            if inst[1].startswith("'") and inst[1].endswith("'"):
+                #char
+                return [ord(inst[1].replace("'", "").encode("utf-8").decode("unicode-escape"))]
+
             base = 10
             if inst[1].startswith("0b"):
                 base = 2
             elif inst[1].startswith("0x"):
                 base = 16
             return [int(inst[1], base)]
+
+        #check if possibly indirect, veery vibecoded
+        ind = '(' in inst[1] and ')' in inst[1]
+        inst[1] = inst[1].replace('(', "")
+        inst[1] = inst[1].replace(')', "")
 
         #not a very robust way to check for rel addresses.
         if inst[0].upper() in ["BEQ", "BMI", "BNE", "BPL", "BVS", "BVC", "BCS", "BCC"]:
@@ -132,21 +143,48 @@ def _inst_to_byte(inst: list[str], pos=0):
                 base = 16
             return [INST_TABLE[inst_name]["imm"], int(inst[1][1:], base)]
         elif inst[1].startswith("$"):
+            tp = "abs"
+
+            #check for other modes
+            if inst[1].endswith(",X"):
+                tp = "absx"
+                inst[1] = inst[1].split(",")[0]
+            elif inst[1].endswith(",Y"):
+                tp = "absy"
+                inst[1] = inst[1].split(",")[0]
+            elif ind:
+                tp = "ind"
+
             #absolute
             base = 10
             if inst[1][1:].startswith("0b"):
                 base = 2
             elif inst[1][1:].startswith("0x"):
                 base = 16
-            return [INST_TABLE[inst_name]["abs"], int(inst[1][1:], 16) & 0xFF, (int(inst[1][1:], 16) >> 8) & 0xFF]
+            return [INST_TABLE[inst_name][tp], int(inst[1][1:], 16) & 0xFF, (int(inst[1][1:], 16) >> 8) & 0xFF]
         else:
+            tp = "zp"
+
+            if inst[1].endswith(",X"):
+                if ind:
+                    tp = "indx"
+                else:
+                    tp = "zpx"
+                inst[1] = inst[1].split(",")[0]
+            elif inst[1].endswith(",Y"):
+                if ind:
+                    tp = "indy"
+                else:
+                    tp = "zpy"
+                inst[1] = inst[1].split(",")[0]
+
             base = 10
             if inst[1].startswith("0b"):
                 base = 2
             elif inst[1].startswith("0x"):
                 base = 16
             #zero page
-            return [INST_TABLE[inst_name]["zp"], int(inst[1], 16)]
+            return [INST_TABLE[inst_name][tp], int(inst[1], 16)]
     else:
         print(f"Invalid instruction format for {inst}")
         exit(1)            
@@ -260,7 +298,7 @@ def symbolize(prog: list[list[str]]):
                      if WARN_AS_ERRORS:
                           raise DoubleConstDefWarning(f"Constant {sym_value} is already defined as {k}!")
                      else:
-                          warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DangerousArgWarning)
+                          warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DoubleConstDefWarning)
             CONSTANTS[sym_name] = sym_value
 
     byte_ctr: int = 0
@@ -270,6 +308,10 @@ def symbolize(prog: list[list[str]]):
             continue #already handled .equ definitions
         if inst[0].startswith(".ignore"):
             continue
+        if inst[0].startswith(".byte"):
+            byte_ctr += 1
+            continue
+        
         
         ign = False
         if i-1 > 0:
@@ -345,15 +387,47 @@ def preprocess(prog: list[list[str]]):
     #now we replace
     for inst in prog:
         for i in range(len(inst)):
-            if inst[i] in LABELS.keys():
-                inst[i] = LABELS[inst[i]]
-            if inst[i] in CONSTANTS.keys():
-                inst[i] = CONSTANTS[inst[i]]
+            #strip modifiers
+            #this whole codeblock makes me nauseous.... 
+            parts = inst[i].split(",")
+            name = parts[0].strip("<").strip(">").strip("(").strip(")")
+            splitter = inst[i]
+            splitter = splitter.split(parts[0].strip("(").strip(")"))
+
+            if name in LABELS.keys():
+                #lets see if we want to split these values.
+                if LABELS[name].startswith("$"):
+                    if inst[i].startswith("<"):
+                        inst[i] = splitter[0] + '#0x' + LABELS[name][1:3] + splitter[1]
+                        continue
+                    elif inst[i].startswith(">"):
+                        inst[i] = splitter[0] + '#0x' + LABELS[name][3:5] + splitter[1]
+                        continue
+                inst[i] = splitter[0] + LABELS[name] + splitter[1]
+            if name in CONSTANTS.keys():
+                if CONSTANTS[name].startswith("$"):
+                    if inst[i].startswith("<"):
+                        inst[i] = splitter[0] + '#0x' + CONSTANTS[name][1:3] + splitter[1]
+                        continue
+                    elif inst[i].startswith(">"):
+                        inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
+                        continue
+                inst[i] = splitter[0] + CONSTANTS[name] + splitter[1]
 
     if TEST_OUTPUT:
+        byte_ctr = 0
         with open("test.to", "w+") as f:
             for eline in prog:
-                f.write(' '.join(eline) + '\n')
+                f.write((str(hex(byte_ctr + ORIGIN))) + ": " + ' '.join(eline) + '\n')
+                byte_ctr += 1
+                if len(eline) == 1:
+                    continue
+
+                #check for branch instructions
+                if eline[1].startswith("$") and not eline[0] in ["BCC", "BCS", "BNE", "BPL", "BMI", "BPL", "BVC", "BVS"]:
+                    byte_ctr += 2
+                else:
+                    byte_ctr += 1
         print(f"Dumped debug output to test.to")
         exit(0)
    
@@ -364,7 +438,7 @@ def preprocess(prog: list[list[str]]):
             continue #if by SOME CHANCE there are still labels, skip them
         #handle possible absolute args for byte_cnter
         if len(prog[i]) > 1:
-            if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BEQ", "BMI", "BNE", "BPL", "BVS"]:
+            if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BCC", "BCS", "BNE", "BPL", "BMI", "BPL", "BVC", "BVS"]:
                 byte_cnter += 2
             else:
                 byte_cnter += 1
