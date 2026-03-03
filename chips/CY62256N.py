@@ -10,7 +10,7 @@ class CY62256N:
         self.n_oe = EPin()
         self.n_ce = EPin()
         
-        self._memory = [0 for _ in range(32_768)]
+        self._memory = [None for _ in range(32_768)]
         
     def debug(self):
         return {
@@ -20,6 +20,41 @@ class CY62256N:
             'n_oe' : self.n_oe.state,
             'n_we' : self.n_we.state
         }
+        
+    def print_dbg(self):
+        dbg = self.debug()
+        if self.n_ce.state:
+            """print('\n'.join((
+                "CY62256N :",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
+                f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
+                f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
+            )))"""
+            
+            print('\n'.join((
+                "xxxCY62256N",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                )))
+            return
+        
+        if not self.n_we.state:
+            print('\n'.join((
+                "-->CY62256N",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                )))
+            return
+            
+        if not self.n_oe.state:
+            print('\n'.join((
+                "<--CY62256N",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                )))
+            return
         
     def show(self, f, t):
         for i in range(int(f, 16), int(t, 16)):
@@ -36,15 +71,6 @@ class CY62256N:
         
     def update(self):
         if self.n_ce.state:
-            dbg = self.debug()
-            print('\n'.join((
-                "CY62256N :",
-                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
-                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
-                f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
-                f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
-                f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
-            )))
             return
         
         if not self.n_we.state:
@@ -73,13 +99,3 @@ class CY62256N:
             pad = [False for _ in range(8-len(data))]
             pad.extend(data)
             self.io_bus.signal(pad)
-            
-        dbg = self.debug()
-        print('\n'.join((
-            "CY62256N :",
-            f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
-            f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
-            f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
-            f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
-            f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
-        )))

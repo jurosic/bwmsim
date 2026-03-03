@@ -11,7 +11,7 @@ class AT28C256():
         self.n_oe     = EPin()
         self.n_we     = EPin()
         
-        self._memory = [0 for _ in range(0, 32_768)]
+        self._memory = [None for _ in range(0, 32_768)]
         
     def debug(self):
         return {
@@ -22,22 +22,47 @@ class AT28C256():
             'n_we' : self.n_we.state
         }
         
-    def update(self):
+    def print_dbg(self):
+        dbg = self.debug()
         if self.n_ce.state:
-            dbg = self.debug()
-            print('\n'.join((
+            """print('\n'.join((
                 "AT28C256 :",
                 f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
                 f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
                 f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
                 f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
                 f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
-            )))
+            )))"""
+            print('\n'.join((
+                "xxxAT28C256",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                )))
+            return
+        
+        if not self.n_oe.state:
+            """print('\n'.join((
+                "AT28C256 :",
+                f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
+                f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
+                f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
+            )))"""
+            print('\n'.join((
+                    "<--AT28C256",
+                    f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
+                    f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
+                    )))
+            return
+        
+    def update(self):
+        if self.n_ce.state:
             return
 
         if not self.n_we.state:
             #todo?
-            pass
+            return
 
         if not self.n_oe.state:
             #decode address from addrpins
@@ -53,17 +78,7 @@ class AT28C256():
             pad = [False for _ in range(8-len(data))]
             pad.extend(data)
             self.io_bus.signal(pad)
-        
-        dbg = self.debug()
-        print('\n'.join((
-            "AT28C256 :",
-            f"IOB :{dbg['io']:#010b} ({hex(dbg['io'])})",
-            f"ADB :{dbg['ab']:#010b} ({hex(dbg['ab'])})",
-            f"CE  :{dbg['n_ce']} ({not dbg['n_ce']})",
-            f"OE  :{dbg['n_oe']} ({not dbg['n_oe']})",
-            f"WE  :{dbg['n_we']} ({not dbg['n_we']})"
-        )))
-            
+
             
     def load(self, filename: str):
         #should be .bin files
