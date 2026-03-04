@@ -7,8 +7,8 @@ STRICTNESS = 1
 OUTPUT_FILE = "a.bin"
 WARN_AS_ERRORS = False
 LIB_DIR = None
-DYN_MEM_START = int("0xFF00", 16)
-DYN_MEM_END = int("0xFFFF", 16) 
+DYN_MEM_START = int("0x7F00", 16)
+DYN_MEM_END = int("0x7FFF", 16) 
 
 ORIGIN = 0x0000
 
@@ -327,7 +327,7 @@ def symbolize(prog: list[list[str]]):
                      else:
                           warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DoubleConstDefWarning)
             #check if maybe tries to go into dynamic memspace
-            if int(sym_value[1:], 16) in range(DYN_MEM_START, DYN_MEM_END) and sym_value.startswith("$"):
+            if sym_value.startswith("$") and int(sym_value[1:], 16) in range(DYN_MEM_START, DYN_MEM_END):
                 if WARN_AS_ERRORS:
                     raise ConstInDynMemWarning(f"Constant {sym_name} is being defined in the dynamic memory pool.")
                 else:
@@ -519,7 +519,11 @@ def preprocess(prog: list[list[str]]):
             #skips possible prefixes
             #can maybe cause isues undef vars
             #with name length one?
-            int(inst[1][1:], 0) #autobase
+            if inst[1].startswith("("):
+                #just pass for now but this is a TODO
+                continue
+            if inst[1].startswith("#") or inst[1].startswith("$"):
+                int(inst[1][1:], 0) #autobase
         except ValueError:
             raise VarUndefinedError(f"{inst[1]} is undefined!")
 
