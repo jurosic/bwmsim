@@ -49,16 +49,23 @@ The assembler/compiler is mostly just vibecoded for now, but features a custom s
       - they can be defined anywhere in the code and are available globally
       - they do not follow any scopes
       - the compiler may warn about duplicate constants if the right strictness is set
-   2. ignore
+   2. res
+      - this directive is used to define a variable the memory location of which is automatically determined by the compiler
+      - creating a var can be done like so: `.equ name, size`
+      - they act similar to constants
+   3. rel
+      - this directive is used to release a variable 
+      - releasing a var can be done like so: `.rel name`
+   4. ignore
       - writing `.ignore` **above** the directive makes the compiler ignore any warnings or errors that directive could have caused
-   3. extern
+   5. extern
       - adds an external code file to the current file at preprocessing, used for libraries
       - used like so: `.extern print`
       - adds `print.asm` **at the top** of the program the `.extern` is written in
-   4. byte
+   6. byte
       - signals the compiler to write a raw byte at the current location
       - `.byte 'H'`
-   5. org
+   7. org
       - tells the compiler what address the program should start at
       - `.org $8000`
 5. **Different numeric bases**
