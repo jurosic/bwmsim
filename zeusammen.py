@@ -7,6 +7,8 @@ STRICTNESS = 1
 OUTPUT_FILE = "a.bin"
 WARN_AS_ERRORS = False
 LIB_DIR = None
+DYN_MEM_START = int("0xFF00", 16)
+DYN_MEM_END = int("0xFFFF", 16) 
 
 ORIGIN = 0x0000
 
@@ -15,6 +17,15 @@ LIBS = []
 LABELS = {}
 CONSTANTS = {}
 VARIABLES = {}
+"""
+    name: { 
+        "addr": addr,
+        "size": size,
+        "scope": null | int,
+        "released": true | false
+    }
+"""
+
 
 INST_TABLE = {
         "ADC": { "imm": 0x69, "abs": 0x6d, "zp": 0x65, "indx": 0x61, "indy": 0x71, "zpx": 0x75, "absx": 0x7D, "absy": 0x79 },
@@ -90,6 +101,12 @@ class DoubleConstDefWarning(Warning):
     pass
 
 class DangerousArgWarning(Warning):
+    pass
+
+class OutOfMemoryError(Exception):
+    pass
+
+class VarUndefinedError(Exception):
     pass
 
 def _inst_to_byte(inst: list[str], pos=0): 
@@ -225,6 +242,8 @@ def _help():
         "-werr: Treat warnings as errors (implies -S 2)",
         "-to: Output the sanitized and symbolized program to test.to and exit (for testing",
         "-ld: Specify a library directory to search for .extern files (required if using .extern directives",
+        "-dyns: Specify the starting address of the dynamic memory allocation pool (defaults to 0xFF00)",
+        "-dyne: Specify the ending address of the dynamic memory allocation pool (defaults to 0xFFFF)",
         "",
         "Libraries are added to the TOP of the program, this makes parsing some things easier."
     )))
@@ -257,6 +276,8 @@ def sanitize(line: str) -> list[str]:
     cde = line[:cmt_start]
     cde = cde.strip()
     if cde.startswith(".equ"):
+        cde = [cde[:4], cde[4:].strip()]
+    elif cde.startswith(".res"):
         cde = [cde[:4], cde[4:].strip()]
     else:
         cde = cde.split(" ")
@@ -301,6 +322,45 @@ def symbolize(prog: list[list[str]]):
                           warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DoubleConstDefWarning)
             CONSTANTS[sym_name] = sym_value
 
+        if inst[0].startswith(".res"):
+            #.res syntax: .res [name], [size]
+            #dynamically tries to reserve memory
+            #with the given size
+            parts = inst[1].split(",")
+            if len(parts) != 2:
+                print(f"Invalid .res directive: {inst}")
+                exit(1)
+            sym_name = parts[0].strip()
+            sym_value = int(parts[1].strip())
+            if sym_name in VARIABLES.keys() and not VARIABLES[sym_name]['released']:
+                raise SymbolRedefinitionError(f"Variable {sym_name} is being redefined before being released!")
+            #idk if we need to check if it already exists somewhere
+            #run space finding algo
+            m_ctr = 0
+            for i in range(DYN_MEM_START, DYN_MEM_END):
+                #inefficient
+                for k in VARIABLES.keys():
+                    if i in range(int(VARIABLES[k]['addr'], 16), int(VARIABLES[k]['addr'], 16)+VARIABLES[k]['size']) and not VARIABLES[k]['released']:
+                        m_ctr = -1 #avoids having to do all sorts of shenanigans to continue parent loop
+                        break
+
+                m_ctr += 1
+                if m_ctr == sym_value:
+                    #found our free space
+                    VARIABLES[sym_name] = {"addr": f"0x{i-m_ctr+1:04x}", "size": sym_value, "released": False, "scope": None}
+                    break
+            else: #yes, i know, very weird
+                raise OutOfMemoryError(f"Ran out of memory when trying to allocate size {sym_value} for {sym_name}!")
+
+        if inst[0].startswith(".rel"):
+            #.rel syntax: .rel [name]
+            #releases dynamically allocated memory
+            inst[1] = inst[1].strip()
+            if inst[1] not in VARIABLES.keys():
+                raise VarUndefinedError(f"Undefined variable when trying to free {inst[1]}!")
+            VARIABLES[inst[1]]['released'] = True
+
+
     byte_ctr: int = 0
     for i, inst in enumerate(prog):
         
@@ -310,6 +370,10 @@ def symbolize(prog: list[list[str]]):
             continue
         if inst[0].startswith(".byte"):
             byte_ctr += 1
+            continue
+        if inst[0].startswith(".res"):
+            continue
+        if inst[0].startswith(".rel"):
             continue
         
         
@@ -363,7 +427,13 @@ def symbolize(prog: list[list[str]]):
         i = len(prog) - plen - 1
         if len(prog[i]) == 1 and prog[i][0].endswith(":"):
             prog.pop(i)
-        if prog[i][0].startswith(".equ") or prog[i][0].startswith(".ignore"):
+        if prog[i][0].startswith(".equ"):
+            prog.pop(i)
+        if prog[i][0].startswith(".ignore"):
+            prog.pop(i)
+        if prog[i][0].startswith(".res"):
+            prog.pop(i)
+        if prog[i][0].startswith(".rel"):
             prog.pop(i)
 
     #remove any empty lines
@@ -413,6 +483,15 @@ def preprocess(prog: list[list[str]]):
                         inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
                         continue
                 inst[i] = splitter[0] + CONSTANTS[name] + splitter[1]
+            if name in VARIABLES.keys():
+                #always absolute
+                if inst[i].startswith("<"):
+                    inst[i] = splitter[0] + '#0x' + CONSTANTS[name][1:3] + splitter[1]
+                    continue
+                elif inst[i].startswith(">"):
+                    inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
+                    continue
+                inst[i] = splitter[0] + VARIABLES[name]['addr'] + splitter[1]
 
     if TEST_OUTPUT:
         byte_ctr = 0
@@ -584,6 +663,16 @@ if __name__ == "__main__":
                     print("Please supply a library directory after -ld")
                     exit(1)
                 LIB_DIR = args[i + 1]
+            case "-dyns":
+                if i + 1 >= len(args):
+                    print("Please supply a memory address after -dyns")
+                    exit(1)
+                DYN_MEM_START = int(args[i + 1], 16)
+            case "-dyne":
+                if i + 1 >= len(args):
+                    print("Please supply a memory address after -dyne")
+                    exit(1)
+                DYN_MEM_END = int(args[i + 1], 16)
             case "-werr":
                 WARN_AS_ERRORS = True
 
