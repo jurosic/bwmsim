@@ -51,7 +51,7 @@ The assembler/compiler is mostly just vibecoded for now, but features a custom s
       - the compiler may warn about duplicate constants if the right strictness is set
    2. res
       - this directive is used to define a variable the memory location of which is automatically determined by the compiler
-      - creating a var can be done like so: `.equ name, size`
+      - creating a var can be done like so: `.res name, size`
       - they act similar to constants
    3. rel
       - this directive is used to release a variable 
