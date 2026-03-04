@@ -1,17 +1,17 @@
 .org $8000
 
-.res first, 254
+.res first, 255
 .res second, 1
+.equ this_should_warn, $0xFFFE
 START:
 	LDA #10
 	STA first
-	.rel first
-	.res ffirst, 1
+	.rel second
+	.res ssecond, 1
 	LDA #200
-	STA second
+	STA ssecond
 	LDA #30
-	STA ffirst
-	.rel sksk
+	STA ssecond
 
 	BRK
 

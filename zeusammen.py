@@ -103,10 +103,16 @@ class DoubleConstDefWarning(Warning):
 class DangerousArgWarning(Warning):
     pass
 
+class ConstInDynMemWarning(Warning):
+    pass
+
 class OutOfMemoryError(Exception):
     pass
 
 class VarUndefinedError(Exception):
+    pass
+
+class WriteAfterRelease(Exception):
     pass
 
 def _inst_to_byte(inst: list[str], pos=0): 
@@ -320,6 +326,13 @@ def symbolize(prog: list[list[str]]):
                           raise DoubleConstDefWarning(f"Constant {sym_value} is already defined as {k}!")
                      else:
                           warnings.warn(f"Constant {sym_name} is being defined with value {sym_value} which is already defined as {k}. This may lead to issues if {k} is a reserved address.", DoubleConstDefWarning)
+            #check if maybe tries to go into dynamic memspace
+            if int(sym_value[1:], 16) in range(DYN_MEM_START, DYN_MEM_END) and sym_value.startswith("$"):
+                if WARN_AS_ERRORS:
+                    raise ConstInDynMemWarning(f"Constant {sym_name} is being defined in the dynamic memory pool.")
+                else:
+                    warnings.warn(f"Constant {sym_name} is being defined in the dynamic memory pool.", ConstInDynMemWarning)
+
             CONSTANTS[sym_name] = sym_value
 
         if inst[0].startswith(".res"):
@@ -337,20 +350,20 @@ def symbolize(prog: list[list[str]]):
             #idk if we need to check if it already exists somewhere
             #run space finding algo
             m_ctr = 0
-            for i in range(DYN_MEM_START, DYN_MEM_END):
+            for i in range(DYN_MEM_START, DYN_MEM_END+1):
                 #inefficient
                 for k in VARIABLES.keys():
-                    if i in range(int(VARIABLES[k]['addr'], 16), int(VARIABLES[k]['addr'], 16)+VARIABLES[k]['size']) and not VARIABLES[k]['released']:
+                    if i in range(int(VARIABLES[k]['addr'][1:], 16), int(VARIABLES[k]['addr'][1:], 16)+VARIABLES[k]['size']) and not VARIABLES[k]['released']:
                         m_ctr = -1 #avoids having to do all sorts of shenanigans to continue parent loop
                         break
 
                 m_ctr += 1
                 if m_ctr == sym_value:
                     #found our free space
-                    VARIABLES[sym_name] = {"addr": f"0x{i-m_ctr+1:04x}", "size": sym_value, "released": False, "scope": None}
+                    VARIABLES[sym_name] = {"addr": f"$0x{i-m_ctr+1:04x}", "size": sym_value, "released": False, "scope": None}
                     break
             else: #yes, i know, very weird
-                raise OutOfMemoryError(f"Ran out of memory when trying to allocate size {sym_value} for {sym_name}!")
+                raise OutOfMemoryError(f"Ran out of memory when trying to allocate memory of size {sym_value} for {sym_name}!")
 
         if inst[0].startswith(".rel"):
             #.rel syntax: .rel [name]
@@ -484,6 +497,8 @@ def preprocess(prog: list[list[str]]):
                         continue
                 inst[i] = splitter[0] + CONSTANTS[name] + splitter[1]
             if name in VARIABLES.keys():
+                if VARIABLES[name]['released']:
+                    raise WriteAfterRelease(f"Trying to write into released variable {name}!")
                 #always absolute
                 if inst[i].startswith("<"):
                     inst[i] = splitter[0] + '#0x' + CONSTANTS[name][1:3] + splitter[1]
@@ -492,6 +507,21 @@ def preprocess(prog: list[list[str]]):
                     inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
                     continue
                 inst[i] = splitter[0] + VARIABLES[name]['addr'] + splitter[1]
+
+    #can be done after TEST_OUTPUT a little faster
+    #but i want this check to be performed on test
+    #outputs too
+    for inst in prog:
+        #check for valid param
+        if len(inst) == 1:
+            continue
+        try:
+            #skips possible prefixes
+            #can maybe cause isues undef vars
+            #with name length one?
+            int(inst[1][1:], 0) #autobase
+        except ValueError:
+            raise VarUndefinedError(f"{inst[1]} is undefined!")
 
     if TEST_OUTPUT:
         byte_ctr = 0
@@ -513,8 +543,6 @@ def preprocess(prog: list[list[str]]):
     #convert instructions to bytes
     byte_cnter = 0
     for i in range(len(prog)):
-        if prog[i][0].endswith(":"):
-            continue #if by SOME CHANCE there are still labels, skip them
         #handle possible absolute args for byte_cnter
         if len(prog[i]) > 1:
             if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BCC", "BCS", "BNE", "BPL", "BMI", "BPL", "BVC", "BVS"]:
