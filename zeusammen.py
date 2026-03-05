@@ -9,6 +9,7 @@ WARN_AS_ERRORS = False
 LIB_DIR = None
 DYN_MEM_START = int("0x7F00", 16)
 DYN_MEM_END = int("0x7FFF", 16) 
+DUMP_DF = False
 
 ORIGIN = 0x0000
 
@@ -360,7 +361,7 @@ def symbolize(prog: list[list[str]]):
                 m_ctr += 1
                 if m_ctr == sym_value:
                     #found our free space
-                    VARIABLES[sym_name] = {"addr": f"$0x{i-m_ctr+1:04x}", "size": sym_value, "released": False, "scope": None}
+                    VARIABLES[sym_name] = {"addr": f"$0x{i-m_ctr+1:04X}", "size": sym_value, "released": False, "scope": None}
                     break
             else: #yes, i know, very weird
                 raise OutOfMemoryError(f"Ran out of memory when trying to allocate memory of size {sym_value} for {sym_name}!")
@@ -421,11 +422,22 @@ def symbolize(prog: list[list[str]]):
             byte_ctr += 1
             #check length of the arg (1 byte or 2 bytes)
             if len(inst) > 1:
-                if inst[1] in CONSTANTS.keys():
-                    if CONSTANTS[inst[1]].startswith("$"):
+                #this essentially defeats the whole purpose of the 
+                #big chunk of that replaces the vars with their vals
+
+                ops = ["+", "-", "/", "*", "%"]
+
+                name = inst[1]
+                for op in ops:
+                    name = name.split(op)[0]
+
+                if name in CONSTANTS.keys():
+                    if CONSTANTS[name].startswith("$"):
                         byte_ctr += 2
                     else:
                         byte_ctr += 1
+                elif name in VARIABLES.keys():
+                    byte_ctr += 2
                 elif inst[1].startswith("$"):
                     #absolute, 2 bytes
                     byte_ctr += 2
@@ -473,40 +485,137 @@ def preprocess(prog: list[list[str]]):
             #strip modifiers
             #this whole codeblock makes me nauseous.... 
             parts = inst[i].split(",")
-            name = parts[0].strip("<").strip(">").strip("(").strip(")")
+            name = parts[0].strip("<").strip(">").strip("(").strip(")").strip()
             splitter = inst[i]
             splitter = splitter.split(parts[0].strip("(").strip(")"))
 
-            if name in LABELS.keys():
-                #lets see if we want to split these values.
-                if LABELS[name].startswith("$"):
-                    if inst[i].startswith("<"):
-                        inst[i] = splitter[0] + '#0x' + LABELS[name][1:3] + splitter[1]
-                        continue
-                    elif inst[i].startswith(">"):
-                        inst[i] = splitter[0] + '#0x' + LABELS[name][3:5] + splitter[1]
-                        continue
-                inst[i] = splitter[0] + LABELS[name] + splitter[1]
-            if name in CONSTANTS.keys():
-                if CONSTANTS[name].startswith("$"):
-                    if inst[i].startswith("<"):
-                        inst[i] = splitter[0] + '#0x' + CONSTANTS[name][1:3] + splitter[1]
-                        continue
-                    elif inst[i].startswith(">"):
-                        inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
-                        continue
-                inst[i] = splitter[0] + CONSTANTS[name] + splitter[1]
-            if name in VARIABLES.keys():
-                if VARIABLES[name]['released']:
-                    raise WriteAfterRelease(f"Trying to write into released variable {name}!")
-                #always absolute
-                if inst[i].startswith("<"):
-                    inst[i] = splitter[0] + '#0x' + CONSTANTS[name][1:3] + splitter[1]
-                    continue
-                elif inst[i].startswith(">"):
-                    inst[i] = splitter[0] + '#0x' + CONSTANTS[name][3:5] + splitter[1] 
-                    continue
-                inst[i] = splitter[0] + VARIABLES[name]['addr'] + splitter[1]
+            #find the exact key that matches this var
+            v_start = None
+            v_end = None
+            vidx = 0
+            #labels
+            for k in reversed(sorted(LABELS.keys(), key = lambda x : len(x))):
+                for j, ch in enumerate(name):
+                    if vidx >= len(k):
+                        v_start = None
+                        v_end = None
+                        vidx = 0
+                    if ch == k[vidx]:
+                        if v_start == None:
+                            v_start = j
+                        vidx += 1
+                    else:
+                        v_start = None
+                        v_end = None
+                        vidx = 0
+                    if vidx == len(k):
+                        v_end = vidx
+                        break
+                if v_start is not None and v_end is not None:
+                    #lets see if we want to split these values.
+                    v_before = name[:v_start]
+                    v_after  = name[v_end:]
+                    v = name[v_start:v_end]
+
+                    if LABELS[v].startswith("$"):
+                        if inst[i].startswith("<"):
+                            v = eval(f"{v_before}{int(LABELS[v][1:3],16)}{v_after}")
+                            inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                            break
+                        elif inst[i].startswith(">"):
+                            v = eval(f"{v_before}{int(LABELS[v][1:3],16)}{v_after}")
+                            inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                            break 
+                    v = eval(f"{v_before}{int(LABELS[v][1:],16)}{v_after}")
+                    inst[i] = splitter[0] + f"$0x{v:04X}" + splitter[1]
+                    break
+
+            if v_start is None and v_end is None:
+                vidx = 0
+                for k in reversed(sorted(CONSTANTS.keys(), key = lambda x : len(x))):
+                    for j, ch in enumerate(name):
+                        if vidx >= len(k):
+                            v_start = None
+                            v_end = None
+                            vidx = 0
+                        if ch == k[vidx]:
+                            if v_start == None:
+                                v_start = j
+                            vidx += 1
+                        else:
+                            v_start = None
+                            v_end = None
+                            vidx = 0
+                        if vidx == len(k):
+                            v_end = vidx
+                            break
+                    if v_start is not None and v_end is not None:
+                        #lets see if we want to split these values.
+                        v_before = name[:v_start]
+                        v_after  = name[v_end:]
+                        v = name[v_start:v_end]
+
+                        if CONSTANTS[v].startswith("$"):
+                            if inst[i].startswith("<"):
+                                v = eval(f"{v_before}{int(CONSTANTS[v][1:5],16)}{v_after}")
+                                inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                                break
+                            elif inst[i].startswith(">"):
+                                v = eval(f"{v_before}{int(CONSTANTS[v][5:8],16)}{v_after}")
+                                inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                                break
+
+                            v = eval(f"{v_before}{int(CONSTANTS[v][1:],16)}{v_after}")
+                            inst[i] = splitter[0] + f"$0x{v:04X}" + splitter[1]
+                            break
+                        if CONSTANTS[v].startswith("#"):
+                            v = eval(f"{v_before}{int(CONSTANTS[v][1:],16)}{v_after}")
+                            inst[i] = splitter[0] + f"#0x{v:02X}" + splitter[1]
+                            break
+                        v = eval(f"{v_before}{int(CONSTANTS[v],16)}{v_after}")
+                        inst[i] = splitter[0] + f"0x{v:02X}" + splitter[1]
+
+            if v_start is None and v_end is None:
+                vidx = 0
+                for k in reversed(sorted(VARIABLES.keys(), key = lambda x : len(x))):
+                    for j, ch in enumerate(name):
+                        if vidx >= len(k):
+                            v_start = None
+                            v_end = None
+                            vidx = 0
+                        if ch == k[vidx]:
+                            if v_start == None:
+                                v_start = j
+                            vidx += 1
+                        else:
+                            v_start = None
+                            v_end = None
+                            vidx = 0
+                        if vidx == len(k):
+                            v_end = vidx
+                            break
+                    if v_start is not None and v_end is not None:
+                        #lets see if we want to split these values.
+                        v_before = name[:v_start]
+                        v_after  = name[v_end:]
+                        v = name[v_start:v_end]
+
+                        if VARIABLES[v]['released']:
+                            raise WriteAfterRelease(f"Trying to write into released variable {name}!")
+
+
+                        if inst[i].startswith("<"):
+                            v = eval(f"{v_before}{int(VARIABLES[v]['addr'][1:5],16)}{v_after}")
+                            inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                            break
+                        elif inst[i].startswith(">"):
+                            v = eval(f"{v_before}{int(VARIABLES[v]['addr'][5:8],16)}{v_after}")
+                            inst[i] = splitter[0] + '#0x' + f"{v:02X}" + splitter[1]
+                            break
+
+                        v = eval(f"{v_before}{int(VARIABLES[v]['addr'][1:],16)}{v_after}")
+                        inst[i] = splitter[0] + f"$0x{v:04X}" + splitter[1]
+                        break
 
     #can be done after TEST_OUTPUT a little faster
     #but i want this check to be performed on test
@@ -525,6 +634,7 @@ def preprocess(prog: list[list[str]]):
             if inst[1].startswith("#") or inst[1].startswith("$"):
                 int(inst[1][1:], 0) #autobase
         except ValueError:
+            print(inst)
             raise VarUndefinedError(f"{inst[1]} is undefined!")
 
     if TEST_OUTPUT:
@@ -707,6 +817,29 @@ if __name__ == "__main__":
                 DYN_MEM_END = int(args[i + 1], 16)
             case "-werr":
                 WARN_AS_ERRORS = True
+            case "-df":
+                DUMP_DF = True
 
 
     rn_cmp(args[1], OUTPUT_FILE, LIB_DIR)
+
+    for k in LABELS.keys():
+        print(f"{k}: {LABELS[k]}")
+
+    if DUMP_DF:
+        #dump debug flags, maybe use json??
+        with open(OUTPUT_FILE + ".df", "w+") as f:
+            f.write(".begin CONSTANTS\n")
+            for k in CONSTANTS.keys():
+                f.write(f"{CONSTANTS[k]}-{k}\n")
+            f.write(".begin VARIABLES\n")
+            for k in VARIABLES.keys():
+                f.write(f"{VARIABLES[k]['addr']}:")
+                f.write(','.join((
+                    f"name-{k}",
+                    f"size-{VARIABLES[k]['size']}",
+                    f"scope-{VARIABLES[k]['scope']}\n",
+                    )))
+            f.write(".begin LABELS\n")
+            for k in LABELS.keys():
+                f.write(f"{LABELS[k]}-{k}\n")
