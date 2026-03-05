@@ -1,10 +1,14 @@
 .extern DIV_16U
 
 .equ __arg_print_uint16_ptr,   0xFE
-.equ __print_uint16_high,      $0x7FF8
-.equ __print_uint16_low,       $0x7FF9
-.equ __print_uint16_base_high, $0x7FF6
-.equ __print_uint16_base_low,  $0x7FF7
+
+;.equ __print_uint16_high,      $0x7FF8
+;.equ __print_uint16_low,       $0x7FF9
+;.equ __print_uint16_base_high, $0x7FF6
+;.equ __print_uint16_base_low,  $0x7FF7
+
+.res __print_uint16, 2
+.res __print_uint16_base, 2
 
 .equ __print_listener_buffer,  $0x2020
 .equ __print_listener_flags,   $0x2021
@@ -25,32 +29,31 @@ PRINT_UINT16:
 	; back up integer
 	LDY #0
 	LDA (__arg_print_uint16_ptr),Y
-	STA __print_uint16_high
+	STA __print_uint16
 
 	INY
 
 	LDA (__arg_print_uint16_ptr),Y
-	STA __print_uint16_low
+	STA __print_uint16+1
 
 	_PRINT_UINT16_LOOP:
-		LDA #0
-		STA __print_uint16_base_high
 		LDA #10
-		STA __print_uint16_base_low
+		STA __print_uint16_base
+		LDA #0
+		STA __print_uint16_base+1
 		
 		; set pointers
-		; common prefixes
-		LDA #0x7F
+		; dividend
+		LDA >__print_uint16
+		STA 0xFC
+		; divisor
+		LDA >__print_uint16_base
+		STA 0xFE
+
+		; common
+		LDA <__print_uint16
 		STA 0xFD
 		STA 0xFF
-
-		; dividend
-		LDA #0xF8
-		STA 0xFC
-
-		; divisor
-		LDA #0xF6
-		STA 0xFE
 
 		; divide
 		JSR DIV_16U
@@ -59,7 +62,7 @@ PRINT_UINT16:
 		; are overwritten, but fret not
 		; we only print the remainder
 		; and redivide the quotient
-		LDA __print_uint16_base_low
+		LDA __print_uint16_base
 		STA __print_listener_buffer
 		; since the remainder will always
 		; be in the range 0-9, we can use
@@ -70,12 +73,12 @@ PRINT_UINT16:
 		STA __print_listener_flags
 
 		; check if quotient is 0
-		LDA __print_uint16_high
+		LDA __print_uint16
 		CMP #0
 
 		BNE _PRINT_UINT16_LOOP
 
-		LDA __print_uint16_low
+		LDA __print_uint16+1
 		CMP #0
 
 		BNE _PRINT_UINT16_LOOP
