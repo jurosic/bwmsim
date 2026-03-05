@@ -1,11 +1,12 @@
 .extern PRINT_UINT16
+.extern DIV_16U
 .org $8000
 
 START:
 	; try printing 256
-	LDA #0x01
-	STA $0x2000
 	LDA #0xFF
+	STA $0x2000
+	LDA #0x01
 	STA $0x2001
 
 	LDA #0x00
