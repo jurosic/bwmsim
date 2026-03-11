@@ -31,9 +31,9 @@ def cb():
     rw_neg.update()
     rom.update()
     ram.update()
-    rom.print_dbg()
-    ram.print_dbg()
-    print("--CB END--")
+    #rom.print_dbg()
+    #ram.print_dbg()
+    #print("--CB END--")
 
 def chs(comp_dict):
     global HOOKS
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     cpu.addr_bus.connect(rom.addr_bus, 1, [1, 16])
     
-    cpu.addr_bus.connect(ram.addr_bus, 1, [1, 16])
+    cpu.addr_bus.connect(ram.addr_bus, 1, [1, 16]) 
 
     assert(len(rom.addr_bus.connections) == 1)
     assert(len(ram.addr_bus.connections) == 1)
@@ -71,7 +71,8 @@ if __name__ == "__main__":
     comp_dict = {
             "cpu" : cpu,
             "rom" : rom,
-            "ram" : ram
+            "ram" : ram,
+            "debug_flags": argv[1] + ".df"
             }
 
     while cpu.run:
