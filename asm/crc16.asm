@@ -79,7 +79,7 @@ START:
 
 			SKIP_XOR:
 			
-			DEX 
+			DEY 
 
 			TYA
 			BNE BIT_CRC_LOOP
@@ -91,4 +91,13 @@ START:
 
 		BNE BYTE_CRC_LOOP
 	
+	; print the hash
+
+	LDA >crc_out
+	STA 0xFE
+	LDA <crc_out
+	STA 0xFF
+
+	JSR PRINT_UINT16
+
 	BRK
