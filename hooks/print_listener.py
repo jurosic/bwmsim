@@ -1,10 +1,13 @@
+text = []
 buffer = []
 
 first_call = True
 
 def call(comp_dict):
+    global text
     global buffer
     global first_call
+
     if 'ram' not in comp_dict.keys():
         raise ValueError("This simulation does not have a RAM component!")
     
@@ -26,21 +29,19 @@ def call(comp_dict):
     #      2s - uint8
     #      3u - int16
     #      3s - uint16
-    #      7s - reverse (int to char covnersion)
+    #      5s - \n
+    #      6s - reverse (int to char covnersion)
+    #      7s - EOF 
 
     #very cheesy thing, i dont feel like learning arrays yet
-    reverse = False
-    if flags & 0b10000000:
-        reverse = True
+    if flags & 0b01000000:
+        buffer.reverse()
 
     if flags == 0b00000011:
         #char
         mem = comp_dict['ram'].get_addresses((
                 int("0x2020", 16), ))
-        if reverse:
-            buffer.insert(0, chr(mem[0]))
-        else:
-            buffer.append(chr(mem[0]))
+        buffer.append(chr(mem[0]))
     elif flags == 0b00000001:
         #int8
         mem = comp_dict['ram'].get_addresses((
@@ -51,6 +52,13 @@ def call(comp_dict):
         mem = comp_dict['ram'].get_addresses((
                 int("0x2020", 16), ))
         buffer.append(str(mem[0]))
+    elif flags == 0b00100000:
+        buffer.append("\n")
+    elif flags == 0b10000000:
+        #eof
+        text.extend(buffer)
+        buffer = []
+
 
     #others TODO
 
@@ -58,7 +66,7 @@ def call(comp_dict):
     comp_dict['ram'].set_address(int("0x2021", 16), 0)
 
     print("Print Output:")
-    print(''.join(buffer))
+    print(''.join(text))
 
 def to_signed_int8(val):
     val = val & 0xFF 

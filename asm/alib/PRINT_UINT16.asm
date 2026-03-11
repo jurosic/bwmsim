@@ -83,6 +83,18 @@ PRINT_UINT16:
 
 		BNE _PRINT_UINT16_LOOP
 
+	;send reverse
+	LDA #0b01000000
+	STA __print_listener_flags
+
+	;send newline
+	LDA #0b00100000
+	STA __print_listener_flags
+
+	;send EOF
+	LDA #0b10000000
+	STA __print_listener_flags
+
 	; cleanup
 
 	; restore regs
