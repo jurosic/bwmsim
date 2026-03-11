@@ -377,7 +377,6 @@ def symbolize(prog: list[list[str]]):
 
     byte_ctr: int = 0
     for i, inst in enumerate(prog):
-        
         if inst[0].startswith(".equ"):
             continue #already handled .equ definitions
         if inst[0].startswith(".ignore"):
@@ -428,8 +427,10 @@ def symbolize(prog: list[list[str]]):
                 ops = ["+", "-", "/", "*", "%"]
 
                 name = inst[1]
+                #handle potential comma
+                name = name.split(',')[0].strip()
                 for op in ops:
-                    name = name.split(op)[0]
+                    name = name.split(op)[0].strip()
 
                 if name in CONSTANTS.keys():
                     if CONSTANTS[name].startswith("$"):
@@ -438,7 +439,9 @@ def symbolize(prog: list[list[str]]):
                         byte_ctr += 1
                 elif name in VARIABLES.keys():
                     byte_ctr += 2
-                elif inst[1].startswith("$"):
+                elif name in LABELS.keys():
+                    byte_ctr += 2
+                elif name.startswith("$"):
                     #absolute, 2 bytes
                     byte_ctr += 2
                 else:
@@ -632,7 +635,9 @@ def preprocess(prog: list[list[str]]):
                 #just pass for now but this is a TODO
                 continue
             if inst[1].startswith("#") or inst[1].startswith("$"):
-                int(inst[1][1:], 0) #autobase
+                #check for possible ',' and split at it
+                base = inst[1][1:].split(",")[0]
+                int(base, 0) #autobase
         except ValueError:
             print(inst)
             raise VarUndefinedError(f"{inst[1]} is undefined!")
@@ -644,6 +649,8 @@ def preprocess(prog: list[list[str]]):
                 f.write((str(hex(byte_ctr + ORIGIN))) + ": " + ' '.join(eline) + '\n')
                 byte_ctr += 1
                 if len(eline) == 1:
+                    continue
+                if eline[0].startswith(".byte"):
                     continue
 
                 #check for branch instructions
@@ -659,7 +666,9 @@ def preprocess(prog: list[list[str]]):
     for i in range(len(prog)):
         #handle possible absolute args for byte_cnter
         if len(prog[i]) > 1:
-            if prog[i][1].startswith("$") and prog[i][0].upper() not in ["BCC", "BCS", "BNE", "BPL", "BMI", "BPL", "BVC", "BVS"]:
+            if prog[i][0].startswith(".byte"):
+                pass #lol
+            elif prog[i][1].startswith("$") and prog[i][0].upper() not in ["BCC", "BCS", "BNE", "BPL", "BMI", "BPL", "BVC", "BVS"]:
                 byte_cnter += 2
             else:
                 byte_cnter += 1
@@ -758,15 +767,7 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
 
     symbolize(sanitized)
 
-    #print("Symbol Table:")
-    #for k in SYMTABLE.keys():
-    #    print(f"\t{k} : {SYMTABLE[k]}")
-    #print(sanitized)
-
     preprocess(sanitized)
-
-    #print(sanitized)
-    #print(SYMTABLE)
 
     write_bytes(sanitized, outfile)
 
@@ -777,6 +778,9 @@ def rn_cmp(infile: str, outfile: str, lib_dir: str):
             f"Wrote: {len(sanitized)} instructions, totalling {byte_len} bytes.",
             f"thats {(byte_len/(2**16))*100:.2f}% of 16bit addressing",
             f"or    {(byte_len/(2**15))*100:.2f}% of 15bit addressing",
+        )))
+    print('\n'.join((
+            f"AMA allocated {len(VARIABLES)} vars with size {sum([VARIABLES[k]['size'] for k in VARIABLES])} bytes",
         )))
 
 
@@ -823,8 +827,8 @@ if __name__ == "__main__":
 
     rn_cmp(args[1], OUTPUT_FILE, LIB_DIR)
 
-    for k in LABELS.keys():
-        print(f"{k}: {LABELS[k]}")
+    #for k in LABELS:
+    #    print(f"{k}: {LABELS[k]}")
 
     if DUMP_DF:
         #dump debug flags, maybe use json??
