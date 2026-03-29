@@ -49,6 +49,7 @@ START:
 
 		TYA
 		CMP data_len
+		
 		BMI FOR_DATA_LOAD_LOOP
 
 	; perform crc

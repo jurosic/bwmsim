@@ -637,33 +637,33 @@ class SY6502():
         ccb()
         
         inst = int(''.join(['1' if x else '0' for x in self.data_bus.state]), 2)
-        m = self.get_debug()
-        
-        print('\n'.join(("SY6502-INST :", 
-                         f"DBS :{m['db']:#010b} ({hex(m['db'])})", 
-                         f"PCL :{m['pcl']:#010b} ({hex(m['pcl'])})", 
-                         f"PCH :{m['pch']:#010b} ({hex(m['pch'])})", 
-                         f"ACC :{m['acc']:#010b} ({hex(m['acc'])})", 
-                         f"X   :{m['x']:#010b} ({hex(m['x'])})", 
-                         f"Y   :{m['y']:#010b} ({hex(m['y'])})", 
-                         f"P   :{m['p']:#010b} ({hex(m['p'])})", 
-                         f"S   :{m['s']:#010b} ({hex(m['s'])})", 
-                         f"RW  :{m['rw']}")))
+        #m = self.get_debug()
+        #
+        #print('\n'.join(("SY6502-INST :", 
+        #                 f"DBS :{m['db']:#010b} ({hex(m['db'])})", 
+        #                 f"PCL :{m['pcl']:#010b} ({hex(m['pcl'])})", 
+        #                 f"PCH :{m['pch']:#010b} ({hex(m['pch'])})", 
+        #                 f"ACC :{m['acc']:#010b} ({hex(m['acc'])})", 
+        #                 f"X   :{m['x']:#010b} ({hex(m['x'])})", 
+        #                 f"Y   :{m['y']:#010b} ({hex(m['y'])})", 
+        #                 f"P   :{m['p']:#010b} ({hex(m['p'])})", 
+        #                 f"S   :{m['s']:#010b} ({hex(m['s'])})", 
+        #                 f"RW  :{m['rw']}")))
         
         if inst in self.instruction_set:
             self.instruction_set[inst](ccb)
         
-        m = self.get_debug()
-        print('\n'.join(("SY6502-EXEC :", 
-                         f"DBS :{m['db']:#010b} ({hex(m['db'])})", 
-                         f"PCL :{m['pcl']:#010b} ({hex(m['pcl'])})", 
-                         f"PCH :{m['pch']:#010b} ({hex(m['pch'])})", 
-                         f"ACC :{m['acc']:#010b} ({hex(m['acc'])})", 
-                         f"X   :{m['x']:#010b} ({hex(m['x'])})", 
-                         f"Y   :{m['y']:#010b} ({hex(m['y'])})", 
-                         f"P   :{m['p']:#010b} ({hex(m['p'])})", 
-                         f"S   :{m['s']:#010b} ({hex(m['s'])})", 
-                         f"RW  :{m['rw']}")))
+        #m = self.get_debug()
+        #print('\n'.join(("SY6502-EXEC :", 
+        #                 f"DBS :{m['db']:#010b} ({hex(m['db'])})", 
+        #                 f"PCL :{m['pcl']:#010b} ({hex(m['pcl'])})", 
+        #                 f"PCH :{m['pch']:#010b} ({hex(m['pch'])})", 
+        #                 f"ACC :{m['acc']:#010b} ({hex(m['acc'])})", 
+        #                 f"X   :{m['x']:#010b} ({hex(m['x'])})", 
+        #                 f"Y   :{m['y']:#010b} ({hex(m['y'])})", 
+        #                 f"P   :{m['p']:#010b} ({hex(m['p'])})", 
+        #                 f"S   :{m['s']:#010b} ({hex(m['s'])})", 
+        #                 f"RW  :{m['rw']}")))
         
         self.__increment_addr_reg()
 

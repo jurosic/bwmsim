@@ -65,8 +65,9 @@ def call(comp_dict):
     #reset flags
     comp_dict['ram'].set_address(int("0x2021", 16), 0)
 
-    print("Print Output:")
-    print(''.join(text))
+    if text != []:
+        print("Print Output:")
+        print(''.join(text))
 
 def to_signed_int8(val):
     val = val & 0xFF 
