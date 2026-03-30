@@ -26,12 +26,16 @@ void _srOutputD(){
 
 void _srPushPH(){
   digitalWrite(RCLK, HIGH);
+  delayMicroseconds(5);
   digitalWrite(RCLK, LOW);
+  delayMicroseconds(5);
 }
 
 void _srPushIN(){
   digitalWrite(SRCLK, HIGH);
+  delayMicroseconds(5);
   digitalWrite(SRCLK, LOW);
+  delayMicroseconds(5);
 }
 
 //---SR FUNCTIONS----
@@ -112,42 +116,63 @@ void romWrite(uint8_t data, uint16_t address){
 
 uint8_t romRead(uint16_t address){
   _romOutputD();
-  _srClear();
   _romSwitchMode(false);
   srSetAddr(address);
   _romChipE();
   _romOutputE();
+  delayMicroseconds(5);
   uint8_t ret = 0;
   for (uint8_t i = 0; i < 8; i++){
     ret |= (digitalRead(13-i) << i);
   }
+  _romOutputD(); 
+  _romChipD();
   return ret;
 }
 
 
 void setup() {
+  randomSeed(analogRead(A5));
   srSetup();
   romSetup();
 
-  Serial.begin(9600);
-  Serial.println("----BEGIN----");
-
-  //romWrite(100, 0);
-
-  for (uint16_t i = 0; i < 10; i++){
-    romWrite((uint8_t)i*10, i);
-  }
-  
-  for (uint16_t i = 0; i < 10; i++){
-    Serial.print("Address ");
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.println(romRead(i));
-  }
-  
+  Serial.begin(115200);
 }
 
+enum SlaveMode {
+  WRITE = 0x10,
+  READ = 0x11,
+  STREAM_WRITE = 0x12
+};
+
+uint16_t serAddress = 0;
+uint8_t serData = 0;
+uint8_t serBuffer[6];
 void loop() {
-  
+  //wait for instruction
+  if (Serial.available() >= 4){
+    Serial.readBytes(serBuffer, 4);
+    serAddress = 0;
+    serAddress |= serBuffer[1];
+    serAddress <<= 8;
+    serAddress |= serBuffer[2];
+    if (serBuffer[0] == WRITE){
+      romWrite(serBuffer[3], serAddress);
+      Serial.write(0x06);
+    } else if (serBuffer[0] == READ){
+      Serial.write(romRead(serAddress));
+    } else if (serBuffer[0] == STREAM_WRITE) {
+      serAddress = (serBuffer[1] << 8) | serBuffer[2];
+      uint8_t blockSize = serBuffer[3]; 
+      
+      for (int i = 0; i < blockSize; i++) {
+        while (Serial.available() == 0); 
+        uint8_t dataByte = Serial.read();
+        
+        romWrite(dataByte, serAddress + i);
+      }
+      Serial.write(0x06); 
+    }
+  }
 
 }
