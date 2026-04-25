@@ -81,9 +81,9 @@ void _romWriteD(){
 
 void _romSwitchMode(bool isWrite){
 if (isWrite) {
-    for(uint8_t i = 0; i < 8; i++) pinMode(13-i, OUTPUT);
+    for(uint8_t i = 0; i < 8; i++) pinMode(12-i, OUTPUT);
   } else {
-    for(uint8_t i = 0; i < 8; i++) pinMode(13-i, INPUT);
+    for(uint8_t i = 0; i < 8; i++) pinMode(12-i, INPUT);
   }
 }
 
@@ -92,6 +92,8 @@ void romSetup(){
   pinMode(ROE, OUTPUT);
   pinMode(RCE, OUTPUT);
   pinMode(RWE, OUTPUT);
+
+
 
   _romWriteD();
   _romChipD();
@@ -105,7 +107,7 @@ void romWrite(uint8_t data, uint16_t address){
   srSetAddr(address);
   _romChipE();
   for(uint8_t i = 0; i < 8; i++){
-    digitalWrite(13-i, data & 1);
+    digitalWrite(12-i, data & 1);
     data = data >> 1;
   }
   _romWriteE();
@@ -123,7 +125,7 @@ uint8_t romRead(uint16_t address){
   delayMicroseconds(5);
   uint8_t ret = 0;
   for (uint8_t i = 0; i < 8; i++){
-    ret |= (digitalRead(13-i) << i);
+    ret |= (digitalRead(12-i) << i);
   }
   _romOutputD(); 
   _romChipD();

@@ -5,9 +5,9 @@ import time
 from tqdm import tqdm
 
 class SlaveShadow():
+    _SELF_TEST = 0x09
     _WRITE_ADDRESS = 0x10
     _READ_ADDRESS = 0x11
-    _WRITE_STREAM = 0x12
 
     @staticmethod
     def write(sobj, address, data):
@@ -23,24 +23,19 @@ class SlaveShadow():
         sobj.write(bytearray((SlaveShadow._READ_ADDRESS, addr_high, addr_low, 0)))
         return sobj.read(1)[0]
     @staticmethod
-    def stream_write(sobj, start_address, data_block):
-        size = len(data_block)
-        addr_high = (start_address >> 8) & 0xFF
-        addr_low = start_address & 0xFF
-        
-        header = bytearray([SlaveShadow._WRITE_STREAM, addr_high, addr_low, size])
-        sobj.write(header)
-        
-        sobj.write(bytearray(data_block))
-        
-        while not (val := sobj.read(1)): pass
+    def self_test(sobj):
+        sobj.write(bytearray((SlaveShadow._SELF_TEST, 0, 0, 0)))
+        ret = sobj.read(1)
+        print(ret)
+        return True if ret == 0x06 else False
+
 
 class WorkMode(Enum):
     WRITE = 0
-    STREAM_WRITE = 1
-    READ = 2
-    CLEAR = 3
-    READ_ADDRESS = 4
+    READ = 1
+    CLEAR = 2
+    READ_ADDRESS = 3
+    SELF_TEST = 4
 
 class SpeedMode(Enum):
     NORMAL = 0
@@ -87,6 +82,8 @@ def parse_args():
                 SKIP_NULLB = True
             case '--clear':
                 MODE = WorkMode.CLEAR
+            case '--selftest':
+                MODE = WorkMode.SELF_TEST
             case '-ar':
                 i+=1
                 if i < len(argv):
@@ -114,6 +111,7 @@ def parse_args():
         print("Not all arguments specified")
         exit(1)
     if FILE == None:
+        print("File not specified, defaulting stdio")
         if MODE == WorkMode.WRITE:
             FILE = sys.stdin.buffer
         if MODE == WorkMode.READ:
@@ -122,6 +120,7 @@ def parse_args():
         FILE = open(FILE, "wb") if MODE == WorkMode.READ else open(FILE, "rb")
 
     if RANGE == None:
+        print("No address specified, defaulting whole rom")
         RANGE = [0, 32768]
 
 
@@ -129,8 +128,12 @@ if __name__ == "__main__":
     parse_args()
 
     ser = serial.Serial(PORT, 115200)
+    print(f"Working with rom in ", end="", flush=True)
+    for i in range(1, 4):
+        print(f"{4-i}.. ", end="", flush=True)
+        time.sleep(1)
+    print()
     #wait some time for arduino to boot
-    time.sleep(3)
     ser.reset_input_buffer()
 
     match MODE:
@@ -139,7 +142,7 @@ if __name__ == "__main__":
             val = SlaveShadow.read(ser, ADDRESS)
             print(val)
         case WorkMode.READ:
-            for i in range(RANGE[0], RANGE[1]):
+            for _, i in tqdm(enumerate(range(RANGE[0], RANGE[1])), total=len(range(RANGE[0], RANGE[1])), unit='bytes'):
                 FILE.write(SlaveShadow.read(ser, i).to_bytes())
         case WorkMode.WRITE:
             data = FILE.read(32_768)
@@ -164,32 +167,6 @@ if __name__ == "__main__":
                             exit(1)
                 case _:
                     pass
-        case WorkMode.STREAM_WRITE:
-            data = FILE.read(32768)
-            chunk_size = 64
-            
-            with tqdm(total=len(data), unit='B', unit_scale=True) as pbar:
-                for i in range(0, len(data), chunk_size):
-                    chunk = data[i : i + chunk_size]
-                    SlaveShadow.stream_write(ser, i, chunk)
-                    pbar.update(len(chunk))
-            match SPEED:
-                case SpeedMode.NORMAL:
-                    print("Veryfing")
-                    ser.setDTR(False)
-                    time.sleep(0.1)
-                    ser.setDTR(True)
-                    time.sleep(3)
-                    ser.reset_input_buffer()
-                    #verify file
-                    for i, byte in tqdm(enumerate(data), total=len(data), unit='bytes'):
-                        red = SlaveShadow.read(ser, i)
-                        if byte != red:
-                            print("Upload corrupted!")
-                            exit(1)
-                case _:
-                    pass
-
             
         case WorkMode.CLEAR:
             for _, i in tqdm(enumerate(range(RANGE[0], RANGE[1])), total=len(range(RANGE[0], RANGE[1])), unit='bytes'):
@@ -209,4 +186,13 @@ if __name__ == "__main__":
                             print("Upload corrupted!")
                             exit(1)
                 case _:
-                    pass   
+                    pass
+
+        case WorkMode.SELF_TEST:
+            res = SlaveShadow.self_test(ser)
+            if res:
+                print("SelfTest passed!!")
+                exit(0)
+            else:
+                print("SelfTest error!!")
+                exit(1)
